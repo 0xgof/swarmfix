@@ -1,0 +1,19 @@
+[project]
+name = "swarmfix"
+version = "0.1.0"
+description = "Cooperative GNSS/UWB localisation proof of concept."
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib",
+    "numpy",
+    "pydantic",
+    "scipy",
+]
+
+[project.scripts]
+swarmfix-run = "swarmfix.cli:main"
+swarmfix-run-all = "swarmfix.run_all_configs:main"
+swarmfix-live-server = "swarmfix.live.server:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
