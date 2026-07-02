@@ -1,0 +1,38 @@
+seed = 5
+
+[scenario]
+name = "square_static"
+dimension = 2
+formation = "square"
+num_agents = 4
+spacing_m = 5.0
+
+[topology]
+mode = "full_pairwise"
+
+[gnss]
+sigma_m = 2.0
+common_bias_m = [0.5, -0.25]
+independent_sigma_m = 0.8
+outlier_probability = 0.0
+outlier_sigma_m = 0.0
+spatial_correlation_enabled = false
+spatial_correlation_sigma_m = 0.0
+
+[uwb]
+enabled = true
+sigma_m = 0.1
+max_range_m = 20.0
+missing_link_probability = 0.0
+nlos_probability = 0.0
+nlos_positive_bias_m = 0.0
+
+[reference]
+enabled = false
+type = "known_agent_position"
+
+[estimation]
+method = "least_squares"
+robust_loss = "linear"
+export_solver_trace = true
+max_iterations = 50

@@ -1,0 +1,40 @@
+seed = 23
+
+[scenario]
+name = "spatially_correlated_gnss"
+dimension = 2
+formation = "grid"
+num_agents = 10
+spacing_m = 5.0
+
+[topology]
+mode = "neighbour"
+max_distance_m = 7.2
+
+[gnss]
+sigma_m = 2.0
+common_bias_m = [1.0, -0.5]
+independent_sigma_m = 0.6
+outlier_probability = 0.05
+outlier_sigma_m = 8.0
+spatial_correlation_enabled = true
+spatial_correlation_length_m = 20.0
+spatial_correlation_sigma_m = 0.8
+
+[uwb]
+enabled = true
+sigma_m = 0.1
+max_range_m = 7.2
+missing_link_probability = 0.1
+nlos_probability = 0.05
+nlos_positive_bias_m = 1.0
+
+[reference]
+enabled = false
+type = "known_agent_position"
+
+[estimation]
+method = "least_squares"
+robust_loss = "linear"
+export_solver_trace = true
+max_iterations = 100
