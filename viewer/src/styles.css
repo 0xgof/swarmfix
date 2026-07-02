@@ -1,0 +1,145 @@
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #fbfbf8;
+  color: #111111;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.viewer-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  width: 100%;
+  height: 100%;
+}
+
+.viewer-viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #fbfbf8;
+}
+
+.connection-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 320px;
+  padding: 8px 12px;
+  border: 1px solid #d8dce0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.connection-badge-label {
+  font-weight: 600;
+}
+
+.connection-badge-note {
+  color: #555555;
+}
+
+.connection-badge[data-tone="good"],
+.connection-status[data-tone="good"] {
+  border-left: 4px solid #2e9e5b;
+}
+
+.connection-badge[data-tone="warning"],
+.connection-status[data-tone="warning"] {
+  border-left: 4px solid #d99a1b;
+  background: rgba(255, 248, 230, 0.95);
+}
+
+.connection-badge[data-tone="bad"],
+.connection-status[data-tone="bad"] {
+  border-left: 4px solid #cc3b3b;
+  background: rgba(255, 238, 238, 0.95);
+}
+
+.connection-badge[data-tone="neutral"],
+.connection-status[data-tone="neutral"] {
+  border-left: 4px solid #9aa3ab;
+}
+
+.connection-status {
+  margin-top: 16px;
+  padding: 8px 12px;
+  border: 1px solid #d8dce0;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.connection-status h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.connection-status p {
+  margin: 0;
+  color: #555555;
+  overflow-wrap: anywhere;
+}
+
+.side-panel {
+  border-left: 1px solid #d8dce0;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.side-panel h1 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.layer-controls {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.layer-controls label,
+.iteration-slider {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.iteration-slider {
+  margin-top: 20px;
+}
+
+.link-count-control {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+  font-size: 13px;
+}
+
+.inspector {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #d8dce0;
+  font-size: 12px;
+}
+
+.inspector h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+}

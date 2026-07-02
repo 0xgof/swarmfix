@@ -1,0 +1,95 @@
+@import "../ui/primitives/primitives.css";
+
+.catalog-scroll-root {
+  height: 100vh;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-family);
+}
+
+.catalog-section {
+  height: 100vh;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+}
+
+.section-stage {
+  opacity: 0;
+  transform: translateY(var(--space-lg));
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+.catalog-section.visible .section-stage {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.catalog-nav {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.catalog-nav-dots {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.catalog-nav-dot {
+  width: var(--space-sm);
+  height: var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.catalog-nav-dot.active {
+  background: var(--color-text);
+}
+
+.token-grid,
+.catalog-control-demo,
+.catalog-panel-demo {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.section-stage canvas {
+  cursor: grab;
+  touch-action: none;
+}
+
+.section-stage canvas:active {
+  cursor: grabbing;
+}
+
+.prop-handle {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-sm);
+  font-size: 13px;
+}
+
+.prop-handle input {
+  width: 200px;
+}
+
+.prop-handle-value {
+  min-width: 2.5em;
+  text-align: left;
+}
