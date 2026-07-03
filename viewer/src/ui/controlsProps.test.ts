@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createIterationSlider } from "./IterationSlider";
 import { createLayerControls } from "./LayerControls";
-import { createLinkCountControl } from "./LinkCountControl";
+import {
+  createLinkCountControl,
+  updateLinkCountDiagnostics
+} from "./LinkCountControl";
+import { createMissionActionControls } from "./MissionActionControls";
+import { defaultMissionActionState } from "../simulation/missionActions";
 
 describe("props-based viewer controls", () => {
   it("IterationSlider emits the selected iteration without ViewerState", () => {
@@ -38,7 +43,16 @@ describe("props-based viewer controls", () => {
 
   it("LinkCountControl emits the selected link count without ViewerState", () => {
     const onChange = vi.fn();
-    const element = createLinkCountControl({ max: 6, value: 3, onChange });
+    const element = createLinkCountControl({
+      max: 6,
+      value: 3,
+      diagnostics: {
+        candidateLinkCount: 6,
+        selectedLinkCount: 3,
+        adaptiveSelectionEnabled: true
+      },
+      onChange
+    });
     const input = element.querySelector("input") as HTMLInputElement;
 
     input.value = "5";
@@ -46,6 +60,58 @@ describe("props-based viewer controls", () => {
 
     expect(input.max).toBe("6");
     expect(element.textContent).toContain("5");
+    expect(element.textContent).toContain("3/6 selected");
+    expect(element.textContent).toContain("adaptive");
     expect(onChange).toHaveBeenCalledWith(5);
+  });
+
+  it("LinkCountControl diagnostics follow later selection updates", () => {
+    const element = createLinkCountControl({
+      max: 6,
+      value: 3,
+      diagnostics: {
+        candidateLinkCount: 6,
+        selectedLinkCount: 3,
+        adaptiveSelectionEnabled: true
+      },
+      onChange: vi.fn()
+    });
+
+    updateLinkCountDiagnostics(element, {
+      candidateLinkCount: 6,
+      selectedLinkCount: 1,
+      adaptiveSelectionEnabled: true
+    });
+
+    expect(element.textContent).toContain("1/6 selected");
+    expect(element.textContent).not.toContain("3/6 selected");
+  });
+
+  it("MissionActionControls emits typed action updates without ViewerState", () => {
+    const onChange = vi.fn();
+    const element = createMissionActionControls({
+      value: defaultMissionActionState(),
+      onChange
+    });
+    const formation = element.querySelector<HTMLSelectElement>('[name="formation"]')!;
+    const motion = element.querySelector<HTMLSelectElement>('[name="motion"]')!;
+    const speed = element.querySelector<HTMLInputElement>('[name="speedMps"]')!;
+    const amplitude = element.querySelector<HTMLInputElement>(
+      '[name="randomWalkAmplitudeM"]'
+    )!;
+
+    formation.value = "wedge";
+    formation.dispatchEvent(new Event("change"));
+    motion.value = "forward";
+    motion.dispatchEvent(new Event("change"));
+    speed.value = "3.5";
+    speed.dispatchEvent(new Event("input"));
+    amplitude.value = "-4";
+    amplitude.dispatchEvent(new Event("input"));
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ formation: "wedge" }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ motion: "forward" }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ speedMps: 3.5 }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ randomWalkAmplitudeM: 0 }));
   });
 });

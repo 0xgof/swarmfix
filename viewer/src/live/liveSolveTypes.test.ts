@@ -8,6 +8,7 @@ import {
 } from "./liveSolveTypes";
 import type { SceneTrace } from "../data/sceneTypes";
 import { buildLiveEstimationFrame } from "../simulation/liveEstimation";
+import { defaultMissionActionState } from "../simulation/missionActions";
 
 const sceneTrace: SceneTrace = {
   schema_version: "0.1.0",
@@ -101,6 +102,42 @@ describe("live solve type helpers", () => {
       source_id: "agent_0",
       target_id: "agent_1"
     }]);
+  });
+
+  it("keeps mission action state out of live solver request evidence", () => {
+    const liveFrame = buildLiveEstimationFrame(
+      sceneTrace,
+      2,
+      1,
+      0.2,
+      { ...defaultMissionActionState(), formation: "wedge", motion: "path_follow" }
+    );
+    const request = buildLiveSolveRequest(sceneTrace, liveFrame, 1);
+    const requestRecord = request as unknown as Record<string, unknown>;
+
+    expect(requestRecord.truth_for_solver).toBeUndefined();
+    expect(requestRecord.formation_answer).toBeUndefined();
+    expect(requestRecord.future_path).toBeUndefined();
+    expect(requestRecord.formation).toBeUndefined();
+    expect(requestRecord.motion).toBeUndefined();
+  });
+
+  it("keeps adaptive selector internals out of live solver request evidence", () => {
+    const liveFrame = buildLiveEstimationFrame(sceneTrace, 0, 1, 0.2);
+    const request = buildLiveSolveRequest(sceneTrace, liveFrame, 1);
+    const serializedRequest = JSON.parse(JSON.stringify(request));
+
+    expect(serializedRequest.uwb[0]).toEqual({
+      source_id: "agent_0",
+      target_id: "agent_1",
+      distance_m: expect.any(Number),
+      sigma_m: 0.2,
+      true_distance_m: null
+    });
+    expect(JSON.stringify(serializedRequest)).not.toContain("qualityScore");
+    expect(JSON.stringify(serializedRequest)).not.toContain("selectionReason");
+    expect(JSON.stringify(serializedRequest)).not.toContain("candidate");
+    expect(JSON.stringify(serializedRequest)).not.toContain("truth_for_solver");
   });
 
   it("extracts fused positions only from authoritative solver responses", () => {

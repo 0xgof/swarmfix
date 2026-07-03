@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SceneTrace } from "../data/sceneTypes";
-import { createViewerState } from "./ViewerState";
+import { createViewerState, maxUwbLinksPerAgentLimit } from "./ViewerState";
 import { PlaybackController } from "./PlaybackController";
 
 function sceneWithIterations(iterations: number): SceneTrace {
@@ -40,20 +40,73 @@ describe("viewer state and playback", () => {
     const viewerState = createViewerState(sceneWithIterations(3));
 
     expect(viewerState.layers.uwbLinks).toBe(true);
+    expect(viewerState.layers.positionError).toBe(true);
+    viewerState.setLayerVisible("positionError", false);
+    expect(viewerState.layers.positionError).toBe(false);
     viewerState.setIteration(99);
     expect(viewerState.selectedIteration).toBe(2);
     viewerState.setIteration(-4);
     expect(viewerState.selectedIteration).toBe(0);
   });
 
-  it("tracks max selected UWB links per drone rather than a global link count", () => {
+  it("clamps the per-drone link cap to the number of unique peers in the scene", () => {
     const viewerState = createViewerState(sceneWithIterations(1));
 
+    expect(viewerState.maxUwbLinksPerAgent).toBe(1);
+    viewerState.setMaxUwbLinksPerAgent(12);
     expect(viewerState.maxUwbLinksPerAgent).toBe(1);
     viewerState.setMaxUwbLinksPerAgent(99);
     expect(viewerState.maxUwbLinksPerAgent).toBe(1);
     viewerState.setMaxUwbLinksPerAgent(-5);
     expect(viewerState.maxUwbLinksPerAgent).toBe(0);
+  });
+
+  it("uses nine as the maximum per-drone link cap for a 10-agent scene", () => {
+    const tenAgentScene = {
+      ...sceneWithIterations(1),
+      truth: {
+        nodes: Array.from({ length: 10 }, (_, index) => ({
+          id: `agent_${index}`,
+          position_m: [index, 0]
+        }))
+      },
+      measurements: {
+        gnss: [],
+        uwb: [],
+        references: []
+      }
+    };
+    const viewerState = createViewerState(tenAgentScene);
+
+    expect(maxUwbLinksPerAgentLimit(tenAgentScene)).toBe(9);
+    viewerState.setMaxUwbLinksPerAgent(12);
+    expect(viewerState.maxUwbLinksPerAgent).toBe(9);
+  });
+
+  it("stores mission action state updates", () => {
+    const viewerState = createViewerState(sceneWithIterations(1));
+
+    expect(viewerState.missionAction.formation).toBe("grid");
+    viewerState.setMissionAction({
+      formation: "ring",
+      motion: "forward",
+      speedMps: 1.5,
+      randomWalkAmplitudeM: 0.6
+    });
+
+    expect(viewerState.missionAction.formation).toBe("ring");
+    expect(viewerState.missionAction.previousFormation).toBe("grid");
+    expect(viewerState.missionAction.motion).toBe("forward");
+    expect(viewerState.missionAction.speedMps).toBe(1.5);
+  });
+
+  it("clamps mission action numeric values", () => {
+    const viewerState = createViewerState(sceneWithIterations(1));
+
+    viewerState.setMissionAction({ speedMps: -10, randomWalkAmplitudeM: -2 });
+
+    expect(viewerState.missionAction.speedMps).toBe(0);
+    expect(viewerState.missionAction.randomWalkAmplitudeM).toBe(0);
   });
 
   it("advances playback through exported states only", () => {

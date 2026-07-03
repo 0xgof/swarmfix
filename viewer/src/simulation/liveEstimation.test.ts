@@ -5,6 +5,7 @@ import {
   buildLiveEstimationFrame,
   solveLiveFusion
 } from "./liveEstimation";
+import { defaultMissionActionState } from "./missionActions";
 
 const sceneTrace: SceneTrace = {
   schema_version: "0.1.0",
@@ -80,6 +81,40 @@ const sceneTrace: SceneTrace = {
 };
 
 describe("live estimation frame", () => {
+  it("uses mission action state to hold static truth positions", () => {
+    const actionState = {
+      ...defaultMissionActionState(),
+      motion: "static" as const,
+      randomWalkAmplitudeM: 1
+    };
+    const frameAtStart = buildLiveEstimationFrame(sceneTrace, 0, 3, 0.3, actionState);
+    const laterFrame = buildLiveEstimationFrame(sceneTrace, 8, 3, 0.3, actionState);
+
+    expect(laterFrame.truthPositions.get("agent_0")).toEqual(
+      frameAtStart.truthPositions.get("agent_0")
+    );
+    expect(laterFrame.uwbLinks[0].measuredDistanceM).toBeCloseTo(
+      frameAtStart.uwbLinks[0].measuredDistanceM
+    );
+  });
+
+  it("uses forward mission action state to translate truth and measurements", () => {
+    const actionState = {
+      ...defaultMissionActionState(),
+      motion: "forward" as const,
+      speedMps: 2
+    };
+    const frameAtStart = buildLiveEstimationFrame(sceneTrace, 0, 3, 0.3, actionState);
+    const laterFrame = buildLiveEstimationFrame(sceneTrace, 3, 3, 0.3, actionState);
+
+    expect(laterFrame.truthPositions.get("agent_0")?.[0]).toBeCloseTo(
+      (frameAtStart.truthPositions.get("agent_0")?.[0] ?? 0) + 6
+    );
+    expect(laterFrame.gnssPositions.get("agent_0")?.[0]).toBeCloseTo(
+      (laterFrame.truthPositions.get("agent_0")?.[0] ?? 0) + 0.2
+    );
+  });
+
   it("moves truth and derives GNSS from the moved truth plus original GNSS error", () => {
     const frameAtStart = buildLiveEstimationFrame(sceneTrace, 0, 3, 0.3);
     const laterFrame = buildLiveEstimationFrame(sceneTrace, 1.5, 3, 0.3);
@@ -112,5 +147,244 @@ describe("live estimation frame", () => {
     expect(sparseFused).toBeDefined();
     expect(denseFused).toBeDefined();
     expect(denseFused).not.toEqual(sparseFused);
+  });
+
+  it("carries adaptive UWB selection diagnostics on the live frame", () => {
+    const frame = buildLiveEstimationFrame(sceneTrace, 0, 2, 0, null, {
+      maxRangeM: 2.1,
+      addRangeM: 2.1,
+      dropRangeM: 2.4,
+      maxGraphChangesPerFrame: 10
+    });
+
+    expect(frame.uwbSelection.candidateLinkCount).toBe(2);
+    expect(frame.uwbSelection.selectedLinkCount).toBe(2);
+    expect(frame.uwbSelection.selectionPolicy).toBe("adaptive_range_graph_v1");
+  });
+
+  it("selects unmeasured pairs within range so live formations stay connected", () => {
+    const singleMeasuredPairTrace: SceneTrace = {
+      ...sceneTrace,
+      truth: {
+        nodes: [
+          { id: "agent_0", position_m: [0, 0] },
+          { id: "agent_1", position_m: [2, 0] },
+          { id: "agent_2", position_m: [0, 1] }
+        ]
+      },
+      measurements: {
+        ...sceneTrace.measurements,
+        uwb: [{
+          source_id: "agent_0",
+          target_id: "agent_1",
+          measured_distance_m: 2,
+          sigma_m: 0.1,
+          true_distance_m: 2
+        }]
+      }
+    };
+
+    const frame = buildLiveEstimationFrame(singleMeasuredPairTrace, 0, 3, 0);
+
+    expect(frame.uwbSelection.candidateLinkCount).toBe(3);
+    expect(frame.uwbLinks.map((link) => `${link.sourceId}::${link.targetId}`))
+      .toEqual(["agent_0::agent_1", "agent_0::agent_2", "agent_1::agent_2"]);
+  });
+
+  it("does not select a collinear skip link that would render as a doubled cord", () => {
+    const collinearRowTrace: SceneTrace = {
+      ...sceneTrace,
+      truth: {
+        nodes: [
+          { id: "agent_0", position_m: [0, 0] },
+          { id: "agent_1", position_m: [2, 0] },
+          { id: "agent_2", position_m: [4, 0] }
+        ]
+      },
+      measurements: {
+        ...sceneTrace.measurements,
+        uwb: [
+          {
+            source_id: "agent_0",
+            target_id: "agent_1",
+            measured_distance_m: 2,
+            sigma_m: 0.1,
+            true_distance_m: 2
+          },
+          {
+            source_id: "agent_1",
+            target_id: "agent_2",
+            measured_distance_m: 2,
+            sigma_m: 0.1,
+            true_distance_m: 2
+          },
+          {
+            source_id: "agent_0",
+            target_id: "agent_2",
+            measured_distance_m: 4,
+            sigma_m: 0.1,
+            true_distance_m: 4
+          }
+        ]
+      }
+    };
+
+    const frame = buildLiveEstimationFrame(collinearRowTrace, 0, 3, 0);
+
+    expect(frame.uwbLinks.map((link) => `${link.sourceId}::${link.targetId}`))
+      .toEqual(["agent_0::agent_1", "agent_1::agent_2"]);
+  });
+
+  it("takes sigma from the matching measurement and falls back to the median for unmeasured pairs", () => {
+    const mixedSigmaTrace: SceneTrace = {
+      ...sceneTrace,
+      measurements: {
+        ...sceneTrace.measurements,
+        uwb: [
+          {
+            source_id: "agent_0",
+            target_id: "agent_1",
+            measured_distance_m: 2,
+            sigma_m: 0.1,
+            true_distance_m: 2
+          },
+          {
+            source_id: "agent_0",
+            target_id: "agent_2",
+            measured_distance_m: 2,
+            sigma_m: 0.3,
+            true_distance_m: 2
+          }
+        ]
+      }
+    };
+
+    const frame = buildLiveEstimationFrame(mixedSigmaTrace, 0, 3, 0);
+    const sigmaByPair = new Map(frame.uwbLinks.map((link) => (
+      [`${link.sourceId}::${link.targetId}`, link.sigmaM]
+    )));
+
+    expect(sigmaByPair.get("agent_0::agent_1")).toBe(0.1);
+    expect(sigmaByPair.get("agent_0::agent_2")).toBe(0.3);
+    expect(sigmaByPair.get("agent_1::agent_2")).toBe(0.3);
+  });
+
+  it("retains a measured link across frames within the drop range", () => {
+    const previouslySelectedMeasuredLink = {
+      sourceId: "agent_0",
+      targetId: "agent_1",
+      measuredDistanceM: 2,
+      sigmaM: 0.1,
+      selectionReason: "new" as const
+    };
+
+    const frame = buildLiveEstimationFrame(
+      sceneTrace, 0, 3, 0, null, {}, [previouslySelectedMeasuredLink]
+    );
+    const retainedLink = frame.uwbLinks.find((link) => (
+      link.sourceId === "agent_0" && link.targetId === "agent_1"
+    ));
+
+    expect(retainedLink?.selectionReason).toBe("retained");
+  });
+
+  it("selects far-apart pairs so the per-drone cap governs the graph by default", () => {
+    const farApartTrace: SceneTrace = {
+      ...sceneTrace,
+      truth: {
+        nodes: [
+          { id: "agent_0", position_m: [0, 0] },
+          { id: "agent_1", position_m: [12, 0] },
+          { id: "agent_2", position_m: [0, 9] }
+        ]
+      },
+      measurements: {
+        ...sceneTrace.measurements,
+        gnss: sceneTrace.measurements.gnss.slice(0, 3),
+        uwb: [{
+          source_id: "agent_0",
+          target_id: "agent_1",
+          measured_distance_m: 12,
+          sigma_m: 0.25,
+          true_distance_m: 12
+        }]
+      }
+    };
+
+    const frame = buildLiveEstimationFrame(farApartTrace, 0, 3, 0);
+
+    expect(frame.uwbSelection.candidateLinkCount).toBe(3);
+    expect(frame.uwbLinks.map((link) => `${link.sourceId}::${link.targetId}`))
+      .toEqual(["agent_0::agent_1", "agent_0::agent_2", "agent_1::agent_2"]);
+  });
+
+  it("limits far-apart pairs by the per-drone cap rather than by distance", () => {
+    const farApartTrace: SceneTrace = {
+      ...sceneTrace,
+      truth: {
+        nodes: [
+          { id: "agent_0", position_m: [0, 0] },
+          { id: "agent_1", position_m: [12, 0] },
+          { id: "agent_2", position_m: [0, 9] }
+        ]
+      },
+      measurements: {
+        ...sceneTrace.measurements,
+        gnss: sceneTrace.measurements.gnss.slice(0, 3),
+        uwb: [{
+          source_id: "agent_0",
+          target_id: "agent_1",
+          measured_distance_m: 12,
+          sigma_m: 0.25,
+          true_distance_m: 12
+        }]
+      }
+    };
+
+    const frame = buildLiveEstimationFrame(farApartTrace, 0, 1, 0);
+
+    expect(frame.uwbLinks).toHaveLength(1);
+  });
+
+  it("exposes every pair as a candidate in the 10-agent ring by default", () => {
+    const ringTrace: SceneTrace = {
+      ...sceneTrace,
+      truth: {
+        nodes: Array.from({ length: 10 }, (_, index) => ({
+          id: `agent_${index}`,
+          position_m: [0, 0]
+        }))
+      },
+      measurements: {
+        gnss: [],
+        uwb: [],
+        references: []
+      }
+    };
+    const ringAction = {
+      ...defaultMissionActionState(),
+      formation: "ring" as const,
+      motion: "static" as const
+    };
+
+    const sparseFrame = buildLiveEstimationFrame(ringTrace, 0, 4, 0, ringAction);
+    const denseFrame = buildLiveEstimationFrame(ringTrace, 0, 7, 0, ringAction);
+    const overRequestedFrame = buildLiveEstimationFrame(ringTrace, 0, 12, 0, ringAction);
+    const overRequestedKeys = overRequestedFrame.uwbLinks.map((link) => (
+      [link.sourceId, link.targetId].sort().join("::")
+    ));
+    const degreeByAgent = new Map<string, number>();
+    for (const link of overRequestedFrame.uwbLinks) {
+      degreeByAgent.set(link.sourceId, (degreeByAgent.get(link.sourceId) ?? 0) + 1);
+      degreeByAgent.set(link.targetId, (degreeByAgent.get(link.targetId) ?? 0) + 1);
+    }
+
+    expect(sparseFrame.uwbSelection.candidateLinkCount).toBe(45);
+    expect(denseFrame.uwbSelection.candidateLinkCount).toBe(45);
+    expect(denseFrame.uwbSelection.selectedLinkCount).toBeGreaterThan(
+      sparseFrame.uwbSelection.selectedLinkCount
+    );
+    expect(new Set(overRequestedKeys).size).toBe(overRequestedKeys.length);
+    expect(Math.max(...degreeByAgent.values())).toBeLessThanOrEqual(9);
   });
 });

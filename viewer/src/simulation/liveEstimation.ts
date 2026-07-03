@@ -1,16 +1,25 @@
 import {
   animatedSwarmPosition,
   liftPositionTo3D,
-  selectUwbLinksByMaxDegree,
   type Position3D
 } from "../animation/liveMotion";
 import type { SceneTrace } from "../data/sceneTypes";
+import type { UwbMeasurement } from "../data/sceneTypes";
+import { missionActionPositions, type MissionActionState } from "./missionActions";
+import {
+  selectLiveUwbLinks,
+  type LiveUwbSelectionDiagnostics,
+  type SelectedLiveUwbLink
+} from "./uwbLinkSelection";
+
+const DEFAULT_LIVE_UWB_RANGE_M = Number.POSITIVE_INFINITY;
 
 export interface LiveUwbLink {
   sourceId: string;
   targetId: string;
   measuredDistanceM: number;
   sigmaM: number;
+  selectionReason: "retained" | "new";
 }
 
 export interface LiveEstimationFrame {
@@ -18,12 +27,80 @@ export interface LiveEstimationFrame {
   gnssPositions: Map<string, Position3D>;
   gnssSigma: Map<string, number>;
   uwbLinks: LiveUwbLink[];
+  uwbSelection: LiveUwbSelectionDiagnostics;
+}
+
+export interface LiveUwbSelectionOverrides {
+  maxRangeM?: number;
+  addRangeM?: number;
+  dropRangeM?: number;
+  maxGraphChangesPerFrame?: number;
 }
 
 function distance3D(a: Position3D,
                     b: Position3D): number {
   const distance = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
   return distance;
+}
+
+function endpointKey(sourceId: string,
+                     targetId: string): string {
+  const endpoints = [sourceId, targetId].sort();
+  const key = `${endpoints[0]}::${endpoints[1]}`;
+  return key;
+}
+
+function defaultUwbSigma(sceneTrace: SceneTrace): number {
+  const sigmaValues = sceneTrace.measurements.uwb
+    .map((measurement) => measurement.sigma_m)
+    .filter((sigmaM) => Number.isFinite(sigmaM) && sigmaM > 0)
+    .sort((firstSigma, secondSigma) => firstSigma - secondSigma);
+  if (sigmaValues.length === 0) {
+    return 0.1;
+  }
+
+  const middleIndex = Math.floor(sigmaValues.length / 2);
+  const sigmaM = sigmaValues[middleIndex];
+  return sigmaM;
+}
+
+function liveUwbCandidates(sceneTrace: SceneTrace,
+                           truthPositions: Map<string, Position3D>): UwbMeasurement[] {
+  const sigmaByEndpoint = new Map<string, number>();
+  for (const measurement of sceneTrace.measurements.uwb) {
+    sigmaByEndpoint.set(
+      endpointKey(measurement.source_id, measurement.target_id),
+      measurement.sigma_m
+    );
+  }
+
+  const fallbackSigmaM = defaultUwbSigma(sceneTrace);
+  const agentIds = [...truthPositions.keys()].sort((firstId, secondId) => (
+    firstId.localeCompare(secondId, undefined, { numeric: true })
+  ));
+  const candidates: UwbMeasurement[] = [];
+  for (let sourceIndex = 0; sourceIndex < agentIds.length; sourceIndex += 1) {
+    for (let targetIndex = sourceIndex + 1; targetIndex < agentIds.length; targetIndex += 1) {
+      const sourceId = agentIds[sourceIndex];
+      const targetId = agentIds[targetIndex];
+      const sourcePosition = truthPositions.get(sourceId);
+      const targetPosition = truthPositions.get(targetId);
+      if (!sourcePosition || !targetPosition) {
+        continue;
+      }
+
+      const distanceM = distance3D(sourcePosition, targetPosition);
+      candidates.push({
+        source_id: sourceId,
+        target_id: targetId,
+        measured_distance_m: distanceM,
+        sigma_m: sigmaByEndpoint.get(endpointKey(sourceId, targetId)) ?? fallbackSigmaM,
+        true_distance_m: distanceM
+      });
+    }
+  }
+
+  return candidates;
 }
 
 function nominalTruthPositions(sceneTrace: SceneTrace): Map<string, Position3D> {
@@ -59,15 +136,21 @@ function gnssOffsetByAgent(sceneTrace: SceneTrace): Map<string, Position3D> {
 export function buildLiveEstimationFrame(sceneTrace: SceneTrace,
                                          timeSeconds: number,
                                          maxUwbLinksPerAgent: number,
-                                         motionAmplitudeM: number): LiveEstimationFrame {
+                                         motionAmplitudeM: number,
+                                         missionAction: MissionActionState | null = null,
+                                         selectionOverrides: LiveUwbSelectionOverrides = {},
+                                         previousSelectedLinks: SelectedLiveUwbLink[] = []): LiveEstimationFrame {
   const nominalTruth = nominalTruthPositions(sceneTrace);
   const gnssOffsets = gnssOffsetByAgent(sceneTrace);
   const truthPositions = new Map<string, Position3D>();
   const gnssPositions = new Map<string, Position3D>();
   const gnssSigma = new Map<string, number>();
+  const actionTruthPositions = missionAction
+    ? missionActionPositions([...nominalTruth.keys()], missionAction, timeSeconds)
+    : null;
 
   for (const [agentId, nominalPosition] of nominalTruth.entries()) {
-    const truthPosition = animatedSwarmPosition(
+    const truthPosition = actionTruthPositions?.get(agentId) ?? animatedSwarmPosition(
       agentId,
       nominalPosition,
       timeSeconds,
@@ -87,31 +170,39 @@ export function buildLiveEstimationFrame(sceneTrace: SceneTrace,
     gnssSigma.set(measurement.agent_id, measurement.sigma_m);
   }
 
-  const selectedMeasurements = selectUwbLinksByMaxDegree(
-    sceneTrace.measurements.uwb,
-    maxUwbLinksPerAgent
-  );
-  const uwbLinks = selectedMeasurements.flatMap((measurement) => {
-    const sourcePosition = truthPositions.get(measurement.source_id);
-    const targetPosition = truthPositions.get(measurement.target_id);
-    if (!sourcePosition || !targetPosition) {
-      return [];
+  const candidateMeasurements = liveUwbCandidates(sceneTrace, truthPositions);
+  const maxRangeM = selectionOverrides.maxRangeM ?? DEFAULT_LIVE_UWB_RANGE_M;
+  const addRangeM = selectionOverrides.addRangeM ?? maxRangeM;
+  const dropRangeM = selectionOverrides.dropRangeM ?? maxRangeM * 1.1;
+  const selection = selectLiveUwbLinks({
+    positions: truthPositions,
+    measurements: candidateMeasurements,
+    previousSelectedLinks,
+    options: {
+      maxLinksPerAgent: maxUwbLinksPerAgent,
+      maxRangeM,
+      addRangeM,
+      dropRangeM,
+      preferNearby: true,
+      preferUnderconnectedAgents: true,
+      preferTriangleClosure: true,
+      maxGraphChangesPerFrame: selectionOverrides.maxGraphChangesPerFrame ?? 2
     }
-
-    const liveLink = {
-      sourceId: measurement.source_id,
-      targetId: measurement.target_id,
-      measuredDistanceM: distance3D(sourcePosition, targetPosition),
-      sigmaM: measurement.sigma_m
-    };
-    return [liveLink];
   });
+  const uwbLinks = selection.selectedLinks.map((link) => ({
+    sourceId: link.sourceId,
+    targetId: link.targetId,
+    measuredDistanceM: link.measuredDistanceM,
+    sigmaM: link.sigmaM,
+    selectionReason: link.selectionReason
+  }));
 
   const liveFrame = {
     truthPositions,
     gnssPositions,
     gnssSigma,
-    uwbLinks
+    uwbLinks,
+    uwbSelection: selection.diagnostics
   };
   return liveFrame;
 }
