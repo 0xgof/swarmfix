@@ -1,46 +1,35 @@
 import { PerspectiveCamera, Scene, WebGLRenderer } from "three";
 
-import { animatedGaussianScale } from "../../animation/liveMotion";
-import { createGnssBell } from "../../renderers/GnssBellRenderer";
+import { createGnssGroundUncertainty } from "../../renderers/GnssGroundUncertaintyRenderer";
 import { createNodeObject } from "../../renderers/NodeRenderer";
 import { createViewerMaterials } from "../../style/createMaterials";
 import { layerStyles } from "../../style/layerStyles";
 import { createCatalogSection } from "../CatalogSection";
 import { createPropHandle, createStageOrbitControls } from "../stageInteraction";
 
-export function createGnssCloudSection(): HTMLElement {
-  let animationFrame: number | null = null;
+export function createGnssGroundUncertaintySection(): HTMLElement {
   let sigmaM = 1;
   const section = createCatalogSection({
-    title: "GNSS Uncertainty Cloud",
-    subtitle: "Gaussian bell - width encodes sigma",
-    onVisible: () => { animationFrame = requestAnimationFrame(animate); },
-    onHidden: () => {
-      if (animationFrame !== null) {
-        cancelAnimationFrame(animationFrame);
-        animationFrame = null;
-      }
-    }
+    title: "GNSS Ground Uncertainty",
+    subtitle: "Flat 1-sigma ground rings - darker at center",
+    onVisible: () => undefined,
+    onHidden: () => undefined
   });
   const renderer = new WebGLRenderer({ antialias: true });
   renderer.setSize(600, 400);
   const scene = new Scene();
   scene.background = createViewerMaterials().background;
   const camera = new PerspectiveCamera(45, 600 / 400, 0.1, 100);
-  camera.position.set(0, 1.2, 4);
+  camera.position.set(0, 2.6, 3.4);
   camera.lookAt(0, 0, 0);
-  const bell = createGnssBell([0, 0, 0], 1);
-  bell.scale.set(sigmaM, 1, sigmaM);
-  scene.add(bell);
+  let groundUncertainty = createGnssGroundUncertainty([0, 0, 0], sigmaM);
+  scene.add(groundUncertainty);
   scene.add(createNodeObject([0, 0, 0], layerStyles.truth.marker));
   const controls = createStageOrbitControls(camera, renderer.domElement);
 
-  function animate(): void {
-    const pulsedScale = animatedGaussianScale("agent_0", sigmaM, performance.now() / 1000);
-    bell.scale.set(pulsedScale, 1, pulsedScale);
+  function render(): void {
     controls.update();
     renderer.render(scene, camera);
-    animationFrame = requestAnimationFrame(animate);
   }
 
   renderer.render(scene, camera);
@@ -53,8 +42,10 @@ export function createGnssCloudSection(): HTMLElement {
     value: sigmaM,
     onInput: (nextSigmaM) => {
       sigmaM = nextSigmaM;
-      bell.scale.set(sigmaM, 1, sigmaM);
-      renderer.render(scene, camera);
+      scene.remove(groundUncertainty);
+      groundUncertainty = createGnssGroundUncertainty([0, 0, 0], sigmaM);
+      scene.add(groundUncertainty);
+      render();
     }
   }));
   return section.element;

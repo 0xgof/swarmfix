@@ -13,6 +13,36 @@ function maxLateralOffset(points: Array<[number, number, number]>,
   return maxOffset;
 }
 
+function maxSegmentAngleDeg(points: Array<[number, number, number]>): number {
+  const segmentAngles: number[] = [];
+
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previousPoint = points[index - 1];
+    const currentPoint = points[index];
+    const nextPoint = points[index + 1];
+    const firstSegment = [
+      currentPoint[0] - previousPoint[0],
+      currentPoint[1] - previousPoint[1],
+      currentPoint[2] - previousPoint[2]
+    ];
+    const secondSegment = [
+      nextPoint[0] - currentPoint[0],
+      nextPoint[1] - currentPoint[1],
+      nextPoint[2] - currentPoint[2]
+    ];
+    const segmentProduct = firstSegment[0] * secondSegment[0]
+      + firstSegment[1] * secondSegment[1]
+      + firstSegment[2] * secondSegment[2];
+    const segmentMagnitude = Math.hypot(...firstSegment) * Math.hypot(...secondSegment);
+    const safeCosine = Math.min(1, Math.max(-1, segmentProduct / segmentMagnitude));
+    const angleDeg = Math.acos(safeCosine) * 180 / Math.PI;
+    segmentAngles.push(angleDeg);
+  }
+
+  const maxAngleDeg = Math.max(...segmentAngles);
+  return maxAngleDeg;
+}
+
 describe("UWB cord renderer geometry", () => {
   it("creates endpoint-local vibration with a calm middle span", () => {
     const points = buildUwbCordPoints(
@@ -23,14 +53,34 @@ describe("UWB cord renderer geometry", () => {
       "agent_0",
       "agent_1"
     );
+    const sourceStartIndex = Math.floor(points.length * 0.06);
+    const sourceEndIndex = Math.floor(points.length * 0.2);
+    const targetStartIndex = Math.floor(points.length * 0.8);
+    const targetEndIndex = Math.floor(points.length * 0.94);
+    const middleStartIndex = Math.floor(points.length * 0.42);
+    const middleEndIndex = Math.floor(points.length * 0.58);
     const endpointOffset = Math.max(
-      maxLateralOffset(points, 1, 5),
-      maxLateralOffset(points, points.length - 6, points.length - 2)
+      maxLateralOffset(points, sourceStartIndex, sourceEndIndex),
+      maxLateralOffset(points, targetStartIndex, targetEndIndex)
     );
-    const middleOffset = maxLateralOffset(points, 9, 15);
+    const middleOffset = maxLateralOffset(points, middleStartIndex, middleEndIndex);
 
     expect(points.length).toBeGreaterThan(16);
     expect(endpointOffset).toBeGreaterThan(middleOffset * 2);
+  });
+
+  it("samples the cord densely enough to avoid hard jitter corners", () => {
+    const points = buildUwbCordPoints(
+      [0, 0, 0],
+      [10, 0, 0],
+      0.8,
+      1.25,
+      "agent_0",
+      "agent_1"
+    );
+
+    expect(points.length).toBeGreaterThanOrEqual(64);
+    expect(maxSegmentAngleDeg(points)).toBeLessThan(24);
   });
 
   it("increases vibration amplitude for higher UWB sigma", () => {

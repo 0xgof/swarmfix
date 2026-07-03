@@ -11,7 +11,7 @@ import { visualTokens } from "./visualTokens";
 
 describe("viewer visual style system", () => {
   it("defines semantic styles for every planned viewer layer", () => {
-    expect(layerStyles.truth.marker.color).toBe(visualTokens.color.black);
+    expect(layerStyles.truth.marker.color).toBe("#000000");
     expect(layerStyles.uwbLink.renderOrder).toBeLessThan(
       layerStyles.fusedEstimate.renderOrder
     );
@@ -23,7 +23,10 @@ describe("viewer visual style system", () => {
     const smallResidual = encodeResidualStress(0.05, 1.0);
     const largeResidual = encodeResidualStress(2.0, 1.0);
 
-    expect(smallResidual.color).toBe(visualTokens.color.black);
+    expect(smallResidual.color).toBe(visualTokens.color.red);
+    expect(layerStyles.gnssResidual.line.color).toBe(visualTokens.color.red);
+    expect(layerStyles.uwbResidual.line.color).toBe(visualTokens.color.red);
+    expect(layerStyles.referenceResidual.line.color).toBe(visualTokens.color.red);
     expect(largeResidual.opacity).toBeGreaterThan(smallResidual.opacity);
     expect(largeResidual.lineWidth).toBeGreaterThan(smallResidual.lineWidth);
   });
@@ -43,6 +46,7 @@ describe("viewer visual style system", () => {
     const secondMaterials = createViewerMaterials();
 
     expect(firstMaterials.truth).not.toBe(secondMaterials.truth);
-    expect(layerStyles.truth.marker.color).toBe(visualTokens.color.black);
+    expect(layerStyles.truth.marker.color).toBe("#000000");
+    expect(firstMaterials.residual.color.getHexString()).toBe("c9362c");
   });
 });

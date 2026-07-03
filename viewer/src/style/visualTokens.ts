@@ -8,6 +8,7 @@ export const visualTokens = Object.freeze({
     softGrey: "#aeb5bb",
     warmGrey: "#ece8df",
     amber: "#c79a3b",
+    red: "#c9362c",
     blue: "#547aa5"
   }),
   opacity: Object.freeze({

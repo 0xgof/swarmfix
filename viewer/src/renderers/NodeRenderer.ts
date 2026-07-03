@@ -26,7 +26,11 @@ export function createNodeObject(position: number[],
       new Vector3(0, 0, -halfSize),
       new Vector3(0, 0, halfSize)
     ]);
-    const cross = new LineSegments(geometry, materials.residual);
+    const crossMaterial = materials.residual.clone();
+    crossMaterial.color.set(style.color);
+    crossMaterial.opacity = style.opacity;
+    crossMaterial.transparent = style.opacity < 1;
+    const cross = new LineSegments(geometry, crossMaterial);
     cross.position.copy(toVector3(position, 0.08));
     return cross;
   }

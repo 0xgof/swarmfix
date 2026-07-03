@@ -1,6 +1,7 @@
-import { LineSegments } from "three";
+import { LineBasicMaterial, LineSegments } from "three";
 import { describe, expect, it } from "vitest";
 
+import { layerStyles } from "../style/layerStyles";
 import { createNodeObject } from "./NodeRenderer";
 
 describe("createNodeObject", () => {
@@ -25,5 +26,16 @@ describe("createNodeObject", () => {
       0, 0, -0.5,
       0, 0, 0.5
     ]);
+  });
+
+  it("renders truth cross markers in fully opaque pitch black", () => {
+    const marker = createNodeObject([0, 0, 0], layerStyles.truth.marker);
+
+    expect(marker).toBeInstanceOf(LineSegments);
+    const truthMarker = marker as LineSegments;
+    const material = truthMarker.material as LineBasicMaterial;
+
+    expect(material.color.getHexString()).toBe("000000");
+    expect(material.opacity).toBe(1);
   });
 });

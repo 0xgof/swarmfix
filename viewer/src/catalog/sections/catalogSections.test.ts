@@ -6,11 +6,13 @@ import { createConnectionStatusSection } from "./ConnectionStatusSection";
 import { createCostBreakdownPanelSection } from "./CostBreakdownPanelSection";
 import { createEdgeDetailsPanelSection } from "./EdgeDetailsPanelSection";
 import { createGnssCloudSection } from "./GnssCloudSection";
+import { createGnssGroundUncertaintySection } from "./GnssGroundUncertaintySection";
 import { createIterationSliderSection } from "./IterationSliderSection";
 import { createLayerControlsSection } from "./LayerControlsSection";
 import { createLinkCountControlSection } from "./LinkCountControlSection";
 import { createMarkersSection } from "./MarkersSection";
 import { createMeasurementInspectorSection } from "./MeasurementInspectorSection";
+import { createMissionActionControlsSection } from "./MissionActionControlsSection";
 import { createNodeDetailsPanelSection } from "./NodeDetailsPanelSection";
 import { createUwbLinkSection } from "./UwbLinkSection";
 import { createVisualTokensSection } from "./VisualTokensSection";
@@ -76,7 +78,8 @@ describe("catalog sections", () => {
     for (const factory of [
       createMarkersSection,
       createUwbLinkSection,
-      createGnssCloudSection
+      createGnssCloudSection,
+      createGnssGroundUncertaintySection
     ]) {
       const section = factory();
       const canvas = section.querySelector("canvas");
@@ -89,7 +92,8 @@ describe("catalog sections", () => {
     for (const factory of [
       createMarkersSection,
       createUwbLinkSection,
-      createGnssCloudSection
+      createGnssCloudSection,
+      createGnssGroundUncertaintySection
     ]) {
       rendererTracker.instances.length = 0;
       factory();
@@ -120,7 +124,8 @@ describe("catalog sections", () => {
     for (const factory of [
       createMarkersSection,
       createUwbLinkSection,
-      createGnssCloudSection
+      createGnssCloudSection,
+      createGnssGroundUncertaintySection
     ]) {
       orbitTracker.instances.length = 0;
       const section = factory();
@@ -166,12 +171,13 @@ describe("catalog sections", () => {
     expect(wideSize.z).toBeGreaterThan(slimSize.z);
   });
 
-  it("sigma handle resizes the GNSS uncertainty cloud", () => {
+  it("sigma handle resizes the GNSS uncertainty bell footprint", () => {
     rendererTracker.instances.length = 0;
     const section = createGnssCloudSection();
     const [renderedScene] = rendererTracker.instances[0].render.mock.calls[0];
     const handleInput = section.querySelector<HTMLInputElement>(".prop-handle input");
     expect(handleInput).not.toBeNull();
+    expect(section.textContent).toContain("Gaussian bell - width encodes sigma");
 
     handleInput!.value = "0.2";
     handleInput!.dispatchEvent(new Event("input"));
@@ -182,6 +188,27 @@ describe("catalog sections", () => {
     const largeSize = new Box3().setFromObject(renderedScene).getSize(new Vector3());
 
     expect(largeSize.x).toBeGreaterThan(smallSize.x);
+    expect(largeSize.y).toBeCloseTo(smallSize.y, 5);
+  });
+
+  it("sigma handle resizes the flat GNSS ground uncertainty rings", () => {
+    rendererTracker.instances.length = 0;
+    const section = createGnssGroundUncertaintySection();
+    const [renderedScene] = rendererTracker.instances[0].render.mock.calls[0];
+    const handleInput = section.querySelector<HTMLInputElement>(".prop-handle input");
+    expect(handleInput).not.toBeNull();
+    expect(section.textContent).toContain("Flat 1-sigma ground rings");
+
+    handleInput!.value = "0.5";
+    handleInput!.dispatchEvent(new Event("input"));
+    const smallSize = new Box3().setFromObject(renderedScene).getSize(new Vector3());
+
+    handleInput!.value = "2";
+    handleInput!.dispatchEvent(new Event("input"));
+    const largeSize = new Box3().setFromObject(renderedScene).getSize(new Vector3());
+
+    expect(largeSize.x).toBeGreaterThan(smallSize.x);
+    expect(largeSize.y).toBeCloseTo(smallSize.y, 5);
   });
 
   it("keeps drawing frames while a mini Three.js section is visible", () => {
@@ -206,10 +233,35 @@ describe("catalog sections", () => {
     }
   });
 
+  it("keeps the flat GNSS ground uncertainty section static while visible", () => {
+    const frameCallbacks: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", vi.fn((callback: FrameRequestCallback) => {
+      frameCallbacks.push(callback);
+      return frameCallbacks.length;
+    }));
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    try {
+      rendererTracker.instances.length = 0;
+      const section = createGnssGroundUncertaintySection();
+      const renderer = rendererTracker.instances[0];
+      const rendersBeforeVisible = renderer.render.mock.calls.length;
+      expect(section.textContent).toContain("Flat 1-sigma ground rings");
+      expect(section.textContent).not.toContain("shimmer");
+
+      section.classList.add("visible");
+
+      expect(frameCallbacks).toHaveLength(0);
+      expect(renderer.render.mock.calls.length).toBe(rendersBeforeVisible);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("renders interactive control sections with live state labels", () => {
     const layerSection = createLayerControlsSection();
     const iterationSection = createIterationSliderSection();
     const linkSection = createLinkCountControlSection();
+    const missionSection = createMissionActionControlsSection();
 
     const layerInput = layerSection.querySelector("input") as HTMLInputElement;
     layerInput.checked = false;
@@ -220,10 +272,14 @@ describe("catalog sections", () => {
     const linkInput = linkSection.querySelector("input") as HTMLInputElement;
     linkInput.value = "5";
     linkInput.dispatchEvent(new Event("input"));
+    const motionSelect = missionSection.querySelector<HTMLSelectElement>('[name="motion"]')!;
+    motionSelect.value = "forward";
+    motionSelect.dispatchEvent(new Event("change"));
 
     expect(layerSection.textContent).toContain("Visible:");
     expect(iterationSection.textContent).toContain("Iteration: 9");
     expect(linkSection.textContent).toContain("Links per drone: 5");
+    expect(missionSection.textContent).toContain("forward");
   });
 
   it("cycles connection status and clears the interval when hidden", () => {

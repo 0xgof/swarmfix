@@ -1,9 +1,6 @@
 import { Group, Scene } from "three";
 
-import {
-  animatedGaussianScale,
-  liftPositionTo3D
-} from "../animation/liveMotion";
+import { liftPositionTo3D } from "../animation/liveMotion";
 import type { SceneTrace } from "../data/sceneTypes";
 import type { LayerVisibility } from "../app/ViewerState";
 import type { LiveSolveResponse } from "../live/liveSolveTypes";
@@ -13,11 +10,16 @@ import {
   latestTraceIteration
 } from "../live/liveSolveTypes";
 import { createCostGlyph } from "../renderers/CostGlyphRenderer";
-import { createGnssCloud } from "../renderers/GnssCloudRenderer";
+import { createGnssGroundUncertainty } from "../renderers/GnssGroundUncertaintyRenderer";
 import { createNodeObject } from "../renderers/NodeRenderer";
+import { createPositionErrorLine } from "../renderers/PositionErrorRenderer";
 import { createResidualVector } from "../renderers/ResidualVectorRenderer";
 import { createUwbLink } from "../renderers/UwbLinkRenderer";
-import { buildLiveEstimationFrame } from "../simulation/liveEstimation";
+import {
+  buildLiveEstimationFrame,
+  type LiveEstimationFrame
+} from "../simulation/liveEstimation";
+import type { MissionActionState } from "../simulation/missionActions";
 import { layerStyles } from "../style/layerStyles";
 import { createViewerMaterials } from "../style/createMaterials";
 import { createGrid } from "./grid";
@@ -32,6 +34,7 @@ const defaultLayers: LayerVisibility = {
   corrected: true,
   references: true,
   uwbLinks: true,
+  positionError: true,
   residuals: true,
   cost: true
 };
@@ -42,18 +45,21 @@ export function createSwarmScene(sceneTrace: SceneTrace,
                                  timeSeconds = 0,
                                  maxUwbLinksPerAgent = sceneTrace.measurements.uwb.length,
                                  motionAmplitudeM = 0.24,
-                                 liveSolveFrame: LiveSolveResponse | null = null): Scene {
+                                 liveSolveFrame: LiveSolveResponse | null = null,
+                                 missionAction: MissionActionState | null = null,
+                                 selectedLiveFrame: LiveEstimationFrame | null = null): Scene {
   const scene = new Scene();
   scene.background = createViewerMaterials().background;
   scene.add(createLights());
   scene.add(createGrid());
 
   const group = new Group();
-  const liveFrame = buildLiveEstimationFrame(
+  const liveFrame = selectedLiveFrame ?? buildLiveEstimationFrame(
     sceneTrace,
     timeSeconds,
     maxUwbLinksPerAgent,
-    motionAmplitudeM
+    motionAmplitudeM,
+    missionAction
   );
   const liveFusedPositions = fusedPositionMap(liveSolveFrame);
   const liveGnssOnlyPositions = gnssOnlyPositionMap(liveSolveFrame);
@@ -66,12 +72,10 @@ export function createSwarmScene(sceneTrace: SceneTrace,
       }
 
       if (layers.gnssUncertainty) {
-        const gaussianRadius = animatedGaussianScale(
-          measurement.agent_id,
-          measurement.uncertainty.radius_m,
-          timeSeconds
-        );
-        group.add(createGnssCloud(gnssPosition, gaussianRadius));
+        group.add(createGnssGroundUncertainty(
+          gnssPosition,
+          measurement.uncertainty.radius_m
+        ));
       }
       if (layers.gnss) {
         const gnssObject = createNodeObject(
@@ -128,6 +132,15 @@ export function createSwarmScene(sceneTrace: SceneTrace,
       );
       nodeObject.userData = { kind: "node", agentId };
       group.add(nodeObject);
+    }
+  }
+
+  if (layers.positionError && layers.truth && layers.fused) {
+    for (const [agentId, truthPosition] of liveFrame.truthPositions.entries()) {
+      const fusedPosition = liveFusedPositions.get(agentId);
+      if (fusedPosition) {
+        group.add(createPositionErrorLine(agentId, truthPosition, fusedPosition));
+      }
     }
   }
 

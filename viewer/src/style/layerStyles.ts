@@ -25,7 +25,7 @@ export interface LayerStyle {
 export const layerStyles = Object.freeze({
   truth: Object.freeze({
     marker: Object.freeze({
-      color: visualTokens.color.black,
+      color: "#000000",
       opacity: visualTokens.opacity.solid,
       size: visualTokens.markerSize.truth,
       shape: "cross" as MarkerShape
@@ -131,27 +131,27 @@ export const layerStyles = Object.freeze({
   uwbLink: Object.freeze({
     marker: Object.freeze({
       color: visualTokens.color.black,
-      opacity: visualTokens.opacity.medium,
+      opacity: visualTokens.opacity.strong,
       size: 0.05,
       shape: "circle" as MarkerShape
     }),
     line: Object.freeze({
       color: visualTokens.color.black,
-      opacity: visualTokens.opacity.medium,
+      opacity: visualTokens.opacity.strong,
       lineWidth: visualTokens.lineWidth.hairline
     }),
     renderOrder: visualTokens.renderOrder.links,
-    opacity: visualTokens.opacity.medium
+    opacity: visualTokens.opacity.strong
   }),
   gnssResidual: Object.freeze({
     marker: Object.freeze({
-      color: visualTokens.color.black,
+      color: visualTokens.color.red,
       opacity: visualTokens.opacity.medium,
       size: 0.05,
       shape: "circle" as MarkerShape
     }),
     line: Object.freeze({
-      color: visualTokens.color.black,
+      color: visualTokens.color.red,
       opacity: visualTokens.opacity.medium,
       lineWidth: visualTokens.lineWidth.thin
     }),
@@ -160,13 +160,13 @@ export const layerStyles = Object.freeze({
   }),
   uwbResidual: Object.freeze({
     marker: Object.freeze({
-      color: visualTokens.color.black,
+      color: visualTokens.color.red,
       opacity: visualTokens.opacity.medium,
       size: 0.05,
       shape: "circle" as MarkerShape
     }),
     line: Object.freeze({
-      color: visualTokens.color.black,
+      color: visualTokens.color.red,
       opacity: visualTokens.opacity.medium,
       lineWidth: visualTokens.lineWidth.thin
     }),
@@ -175,13 +175,13 @@ export const layerStyles = Object.freeze({
   }),
   referenceResidual: Object.freeze({
     marker: Object.freeze({
-      color: visualTokens.color.blue,
+      color: visualTokens.color.red,
       opacity: visualTokens.opacity.medium,
       size: 0.05,
       shape: "circle" as MarkerShape
     }),
     line: Object.freeze({
-      color: visualTokens.color.blue,
+      color: visualTokens.color.red,
       opacity: visualTokens.opacity.medium,
       lineWidth: visualTokens.lineWidth.thin
     }),

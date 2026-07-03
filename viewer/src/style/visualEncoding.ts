@@ -31,7 +31,7 @@ export function encodeResidualStress(residualMagnitude: number,
   const lineWidth = visualTokens.lineWidth.hairline
     + stress * (visualTokens.lineWidth.heavy - visualTokens.lineWidth.hairline);
   const encodedResidual = {
-    color: visualTokens.color.black,
+    color: visualTokens.color.red,
     opacity,
     lineWidth
   };

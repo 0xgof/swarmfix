@@ -7,6 +7,7 @@ import { buildSolverLayerModel } from "../layers/SolverLayer";
 import { buildNodeInspectorModel } from "../ui/NodeDetailsPanel";
 import { buildEdgeInspectorModel } from "../ui/EdgeDetailsPanel";
 import { getCostBreakdown } from "../ui/CostBreakdownPanel";
+import { getPositionErrorBreakdown } from "../ui/PositionErrorPanel";
 import type { LiveSolveResponse } from "../live/liveSolveTypes";
 
 const sceneTrace: SceneTrace = {
@@ -110,7 +111,10 @@ describe("viewer render and inspector models", () => {
     const liveResponse: LiveSolveResponse = {
       schema_version: "0.1.0",
       metadata: { solver: "python-least-squares", selected_uwb_count: 1 },
-      truth: [],
+      truth: [
+        { agent_id: "agent_0", position_m: [0, 0, 0] },
+        { agent_id: "agent_1", position_m: [3, 0, 0] }
+      ],
       measurements: {
         gnss: [],
         uwb: [{
@@ -162,6 +166,7 @@ describe("viewer render and inspector models", () => {
     };
 
     const cost = getCostBreakdown(sceneTrace, 0, liveResponse);
+    const positionError = getPositionErrorBreakdown(sceneTrace, liveResponse);
     const edgeInspector = buildEdgeInspectorModel(
       sceneTrace,
       "agent_0",
@@ -172,9 +177,32 @@ describe("viewer render and inspector models", () => {
 
     expect(cost?.total).toBe(9);
     expect(cost?.uwb).toBe(7);
+    expect(positionError?.estimateMethod).toBe("fused");
+    expect(positionError?.rmseM).toBeCloseTo(Math.sqrt(0.01 / 2));
+    expect(positionError?.maxErrorM).toBeCloseTo(0.1);
     expect(edgeInspector?.measuredDistanceM).toBe(3.2);
     expect(edgeInspector?.currentDistanceM).toBeCloseTo(3.1);
     expect(edgeInspector?.residualM).toBe(-0.1);
     expect(edgeInspector?.weightedSq).toBe(0.16);
+  });
+
+  it("uses corrected scene estimates for exported position error when available", () => {
+    const correctedSceneTrace = {
+      ...sceneTrace,
+      estimates: {
+        ...sceneTrace.estimates,
+        corrected: [
+          { agent_id: "agent_0", position_m: [0.05, 0] },
+          { agent_id: "agent_1", position_m: [3.05, 0] }
+        ]
+      }
+    };
+
+    const positionError = getPositionErrorBreakdown(correctedSceneTrace);
+
+    expect(positionError?.estimateMethod).toBe("corrected");
+    expect(positionError?.rmseM).toBeCloseTo(0.05);
+    expect(positionError?.meanErrorM).toBeCloseTo(0.05);
+    expect(positionError?.maxErrorM).toBeCloseTo(0.05);
   });
 });

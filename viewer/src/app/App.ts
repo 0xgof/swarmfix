@@ -29,14 +29,25 @@ import { createCamera } from "../scene/camera";
 import { createSwarmScene } from "../scene/createScene";
 import { disposeSceneGraph } from "../scene/disposeScene";
 import { buildLiveEstimationFrame } from "../simulation/liveEstimation";
-import { createViewerState, type LayerVisibility, ViewerState } from "./ViewerState";
+import type { LiveEstimationFrame } from "../simulation/liveEstimation";
+import {
+  createViewerState,
+  maxUwbLinksPerAgentLimit,
+  type LayerVisibility,
+  type ViewerState
+} from "./ViewerState";
 import { buildEdgeInspectorModel } from "../ui/EdgeDetailsPanel";
 import { createLayerControls } from "../ui/LayerControls";
 import { buildNodeInspectorModel } from "../ui/NodeDetailsPanel";
 import { createIterationSlider } from "../ui/IterationSlider";
-import { createLinkCountControl } from "../ui/LinkCountControl";
+import {
+  createLinkCountControl,
+  updateLinkCountDiagnostics
+} from "../ui/LinkCountControl";
+import { createMissionActionControls } from "../ui/MissionActionControls";
 import { createSidePanel } from "../ui/SidePanel";
 import { getCostBreakdown } from "../ui/CostBreakdownPanel";
+import { getPositionErrorBreakdown } from "../ui/PositionErrorPanel";
 import { buildConnectionStatusModel } from "../ui/ConnectionStatusPanel";
 import {
   createViewportConnectionBadge,
@@ -53,6 +64,7 @@ const layerLabels: Record<keyof LayerVisibility, string> = {
   corrected: "corrected",
   references: "reference",
   uwbLinks: "UWB",
+  positionError: "position error",
   residuals: "residuals",
   cost: "cost"
 };
@@ -77,6 +89,9 @@ export class App {
   private connectionState: LiveSolverConnectionState;
   private lastRenderedConnectionStatus: LiveSolverConnectionStatus | null;
   private connectionBadge: HTMLElement | null;
+  private previousSelectedUwbLinks: LiveEstimationFrame["uwbLinks"];
+  private latestUwbSelection: LiveEstimationFrame["uwbSelection"] | null;
+  private linkCountControl: HTMLElement | null = null;
 
   constructor(root: HTMLElement,
               sceneUrl = "/examples/full_workflow_demo.json") {
@@ -108,6 +123,8 @@ export class App {
     };
     this.lastRenderedConnectionStatus = null;
     this.connectionBadge = null;
+    this.previousSelectedUwbLinks = [];
+    this.latestUwbSelection = null;
   }
 
   getCameraForTest(): ReturnType<typeof createCamera> | null {
@@ -144,6 +161,17 @@ export class App {
       lastHealthyAtMs: null
     };
     this.lastRenderedConnectionStatus = null;
+    this.previousSelectedUwbLinks = [];
+    this.latestUwbSelection = null;
+    const initialLiveFrame = buildLiveEstimationFrame(
+      sceneTrace,
+      0,
+      this.viewerState.maxUwbLinksPerAgent,
+      this.viewerState.motionAmplitudeM,
+      this.viewerState.missionAction
+    );
+    this.previousSelectedUwbLinks = initialLiveFrame.uwbLinks;
+    this.latestUwbSelection = initialLiveFrame.uwbSelection;
     this.liveSolveScheduler = new LiveSolveScheduler(
       (request) => this.requestLiveSolveWithObservability(request),
       250,
@@ -193,11 +221,30 @@ export class App {
         this.refreshScene();
       }
     }));
-    panel.append(createLinkCountControl({
-      max: this.viewerState.maxUwbLinksPerAgent,
+    this.linkCountControl = createLinkCountControl({
+      max: maxUwbLinksPerAgentLimit(this.viewerState.sceneTrace),
       value: this.viewerState.maxUwbLinksPerAgent,
+      diagnostics: this.linkCountDiagnostics(),
       onChange: (count) => {
         this.viewerState!.setMaxUwbLinksPerAgent(count);
+        this.refreshScene();
+      }
+    });
+    panel.append(this.linkCountControl);
+    panel.append(createMissionActionControls({
+      value: this.viewerState.missionAction,
+      onChange: (nextAction) => {
+        const timeSeconds = (performance.now() - this.startedAtMs) / 1000;
+        const previousFormation = this.viewerState!.missionAction.formation;
+        this.viewerState!.setMissionAction(nextAction, timeSeconds);
+        if (nextAction.formation && nextAction.formation !== previousFormation) {
+          this.previousSelectedUwbLinks = [];
+        }
+        this.recordViewerEvent(
+          "viewer_mission_action_changed",
+          "viewer-mission-action",
+          this.actionContextFields()
+        );
         this.refreshScene();
       }
     }));
@@ -263,7 +310,7 @@ export class App {
 
     const timeSeconds = (performance.now() - this.startedAtMs) / 1000;
     const displayFrame = this.liveSolveScheduler.getDisplayFrame();
-    this.queueLiveSolve(timeSeconds);
+    const liveFrame = this.queueLiveSolve(timeSeconds);
     const nextScene = createSwarmScene(
       this.viewerState.sceneTrace,
       this.viewerState.selectedIteration,
@@ -271,7 +318,9 @@ export class App {
       timeSeconds,
       this.viewerState.maxUwbLinksPerAgent,
       this.viewerState.motionAmplitudeM,
-      displayFrame
+      displayFrame,
+      this.viewerState.missionAction,
+      liveFrame
     );
     this.replaceScene(nextScene);
     this.renderInspector();
@@ -291,7 +340,7 @@ export class App {
       const nowMs = performance.now();
       const timeSeconds = (nowMs - this.startedAtMs) / 1000;
       const displayFrame = this.liveSolveScheduler.getDisplayFrame(nowMs);
-      this.queueLiveSolve(timeSeconds);
+      const liveFrame = this.queueLiveSolve(timeSeconds);
       this.renderConnectionStatus();
       const nextScene = createSwarmScene(
         this.viewerState.sceneTrace,
@@ -300,7 +349,9 @@ export class App {
         timeSeconds,
         this.viewerState.maxUwbLinksPerAgent,
         this.viewerState.motionAmplitudeM,
-        displayFrame
+        displayFrame,
+        this.viewerState.missionAction,
+        liveFrame
       );
       this.replaceScene(nextScene);
       this.controls?.update();
@@ -308,7 +359,10 @@ export class App {
       this.performanceMonitor.recordFrame(
         `viewer-frame-${Math.round(timeSeconds * 1000)}`,
         performance.now() - frameStartMs,
-        { selected_uwb_links: displayFrame?.metadata.selected_uwb_count ?? 0 }
+        {
+          selected_uwb_links: displayFrame?.metadata.selected_uwb_count ?? 0,
+          ...this.actionContextFields()
+        }
       );
       this.flushObservability();
       if (this.liveSolveScheduler.consumeFrameChanged()) {
@@ -348,19 +402,45 @@ export class App {
     this.viewport = null;
     this.panel = null;
     this.connectionBadge = null;
+    this.linkCountControl = null;
   }
 
-  private queueLiveSolve(timeSeconds: number): void {
+  private linkCountDiagnostics(): {
+    candidateLinkCount: number;
+    selectedLinkCount: number;
+    adaptiveSelectionEnabled: boolean;
+  } | undefined {
+    if (!this.latestUwbSelection) {
+      return undefined;
+    }
+
+    const diagnostics = {
+      candidateLinkCount: this.latestUwbSelection.candidateLinkCount,
+      selectedLinkCount: this.latestUwbSelection.selectedLinkCount,
+      adaptiveSelectionEnabled: this.latestUwbSelection.adaptiveSelectionEnabled
+    };
+    return diagnostics;
+  }
+
+  private queueLiveSolve(timeSeconds: number): LiveEstimationFrame | null {
     if (!this.viewerState) {
-      return;
+      return null;
     }
 
     const liveFrame = buildLiveEstimationFrame(
       this.viewerState.sceneTrace,
       timeSeconds,
       this.viewerState.maxUwbLinksPerAgent,
-      this.viewerState.motionAmplitudeM
+      this.viewerState.motionAmplitudeM,
+      this.viewerState.missionAction,
+      {},
+      this.previousSelectedUwbLinks
     );
+    this.previousSelectedUwbLinks = liveFrame.uwbLinks;
+    this.latestUwbSelection = liveFrame.uwbSelection;
+    if (this.linkCountControl) {
+      updateLinkCountDiagnostics(this.linkCountControl, this.linkCountDiagnostics());
+    }
     void this.liveSolveScheduler.tick(performance.now(), () => {
       const request = buildLiveSolveRequest(
         this.viewerState!.sceneTrace,
@@ -380,6 +460,7 @@ export class App {
       };
       return request;
     });
+    return liveFrame;
   }
 
   private async requestLiveSolveWithObservability(request: Parameters<typeof requestLiveSolve>[0]) {
@@ -387,7 +468,9 @@ export class App {
     const spanId = request.trace_context?.span_id ?? `viewer-live-solve-${Math.round(startedAtMs)}`;
     this.recordViewerEvent("viewer_live_solve_request_started", spanId, {
       selected_uwb_links: request.selected_uwb_links.length,
-      endpoint: defaultLiveSolveEndpoint
+      endpoint: defaultLiveSolveEndpoint,
+      ...this.uwbSelectionFields(),
+      ...this.actionContextFields()
     });
     this.flushObservability();
 
@@ -399,12 +482,18 @@ export class App {
         nowMs: performance.now()
       });
       this.performanceMonitor.recordLiveSolve(spanId, durationMs, {
-        selected_uwb_links: request.selected_uwb_links.length
+        selected_uwb_links: request.selected_uwb_links.length,
+        ...this.uwbSelectionFields(),
+        ...this.actionContextFields()
       });
       this.recordViewerEvent(
         "viewer_live_solve_response_received",
         spanId,
-        { selected_uwb_count: response.metadata.selected_uwb_count },
+        {
+          selected_uwb_count: response.metadata.selected_uwb_count,
+          ...this.uwbSelectionFields(),
+          ...this.actionContextFields()
+        },
         durationMs
       );
       this.renderConnectionStatus();
@@ -419,14 +508,18 @@ export class App {
       });
       this.performanceMonitor.recordLiveSolve(spanId, durationMs, {
         selected_uwb_links: request.selected_uwb_links.length,
-        failed: true
+        failed: true,
+        ...this.uwbSelectionFields(),
+        ...this.actionContextFields()
       });
       this.recordViewerEvent(
         "viewer_live_solve_failed",
         spanId,
         {
           error: error instanceof Error ? error.message : String(error),
-          endpoint: defaultLiveSolveEndpoint
+          endpoint: defaultLiveSolveEndpoint,
+          ...this.uwbSelectionFields(),
+          ...this.actionContextFields()
         },
         durationMs
       );
@@ -526,6 +619,41 @@ export class App {
     this.eventBuffer.record(observationEvent);
   }
 
+  private actionContextFields(): Record<string, unknown> {
+    const action = this.viewerState?.missionAction;
+    if (!action) {
+      return {};
+    }
+
+    const fields = {
+      formation_mode: action.formation,
+      motion_mode: action.motion,
+      speed_mps: action.speedMps,
+      random_walk_amplitude_m: action.randomWalkAmplitudeM,
+      max_uwb_links_per_agent: this.viewerState?.maxUwbLinksPerAgent ?? 0
+    };
+    return fields;
+  }
+
+  private uwbSelectionFields(): Record<string, unknown> {
+    const selection = this.latestUwbSelection;
+    if (!selection) {
+      return {};
+    }
+
+    const fields = {
+      candidate_uwb_links: selection.candidateLinkCount,
+      selected_uwb_links: selection.selectedLinkCount,
+      isolated_agents: selection.isolatedAgentCount,
+      graph_components: selection.connectedComponentCount,
+      triangle_count: selection.triangleCount,
+      selection_policy: selection.selectionPolicy,
+      added_links: selection.addedLinks,
+      dropped_links: selection.droppedLinks
+    };
+    return fields;
+  }
+
   private flushObservability(): void {
     void flushObservationEvents(this.eventBuffer, "/observability/events")
       .catch(() => undefined);
@@ -593,6 +721,17 @@ export class App {
     const costHtml = cost
       ? `<p>cost ${cost.total.toFixed(3)} / GNSS ${cost.gnss.toFixed(3)} / UWB ${cost.uwb.toFixed(3)}</p>`
       : "<p>cost unavailable</p>";
+    const positionError = getPositionErrorBreakdown(
+      this.viewerState.sceneTrace,
+      liveSolveFrame
+    );
+    const positionErrorHtml = positionError
+      ? (
+        `<p>position error ${formatMeters(positionError.rmseM)}`
+        + ` ${positionError.estimateMethod} RMSE`
+        + ` / max ${formatMeters(positionError.maxErrorM)}</p>`
+      )
+      : "<p>position error unavailable</p>";
 
     if (this.viewerState.selectedNodeId) {
       const nodeModel = buildNodeInspectorModel(
@@ -604,6 +743,7 @@ export class App {
         ? `
           <h2>${nodeModel.agentId}</h2>
           ${costHtml}
+          ${positionErrorHtml}
           <p>truth ${formatVector(nodeModel.truthPosition)}</p>
           <p>GNSS ${formatVector(nodeModel.gnssPosition)}</p>
           <p>current ${formatVector(nodeModel.currentEstimate)}</p>
@@ -612,7 +752,7 @@ export class App {
           <p>GNSS residual ${formatMeters(nodeModel.gnssResidualNorm)}</p>
           <p>UWB links ${nodeModel.connectedUwbLinks.length}</p>
         `
-        : `<h2>No node data</h2>${costHtml}`;
+        : `<h2>No node data</h2>${costHtml}${positionErrorHtml}`;
       return;
     }
 
@@ -629,15 +769,16 @@ export class App {
         ? `
           <h2>${edgeModel.sourceId} to ${edgeModel.targetId}</h2>
           ${costHtml}
+          ${positionErrorHtml}
           <p>measured ${formatMeters(edgeModel.measuredDistanceM)}</p>
           <p>current ${formatMeters(edgeModel.currentDistanceM)}</p>
           <p>sigma ${formatMeters(edgeModel.sigmaM)}</p>
           <p>residual ${formatMeters(edgeModel.residualM)}</p>
         `
-        : `<h2>No edge data</h2>${costHtml}`;
+        : `<h2>No edge data</h2>${costHtml}${positionErrorHtml}`;
       return;
     }
 
-    inspector.innerHTML = `<h2>Scene</h2>${costHtml}`;
+    inspector.innerHTML = `<h2>Scene</h2>${costHtml}${positionErrorHtml}`;
   }
 }

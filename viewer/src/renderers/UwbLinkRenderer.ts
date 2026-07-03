@@ -67,11 +67,11 @@ export function buildUwbCordPoints(sourcePosition: number[],
                                    timeSeconds: number,
                                    sourceId: string,
                                    targetId: string): CordPoint[] {
-  const pointCount = 28;
+  const pointCount = 72;
   const linkVector = vectorBetween(sourcePosition, targetPosition);
   const normal = perpendicular(linkVector);
   const phase = stablePhase(sourceId, targetId);
-  const vibrationAmplitude = 0.035 + Math.min(Math.max(sigmaM, 0), 2) * 0.18;
+  const vibrationAmplitude = 0.03 + Math.min(Math.max(sigmaM, 0), 2) * 0.14;
   const points: CordPoint[] = [];
 
   for (let index = 0; index < pointCount; index += 1) {
@@ -81,7 +81,9 @@ export function buildUwbCordPoints(sourcePosition: number[],
       (sourcePosition[1] ?? 0) + linkVector[1] * t,
       (sourcePosition[2] ?? 0) + linkVector[2] * t
     ];
-    const wave = Math.sin(t * Math.PI * 18 + timeSeconds * 8 + phase);
+    const primaryWave = Math.sin(t * Math.PI * 12 + timeSeconds * 7 + phase);
+    const secondaryWave = Math.sin(t * Math.PI * 24 + timeSeconds * 5 + phase * 0.5);
+    const wave = primaryWave * 0.82 + secondaryWave * 0.18;
     const envelope = endpointEnvelope(t);
     const displacement = wave * envelope * vibrationAmplitude;
     const cordPoint: CordPoint = [
