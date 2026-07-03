@@ -16,6 +16,10 @@ __pycache__/
 # Repository-local scratch workspace
 READMEDEV.md
 dev/
+graphify-out/
+docs/
+AGENTS.md
+CLAUDE.md
 
 # Build artifacts
 dist/
