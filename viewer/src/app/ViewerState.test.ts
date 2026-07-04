@@ -100,6 +100,18 @@ describe("viewer state and playback", () => {
     expect(viewerState.missionAction.speedMps).toBe(1.5);
   });
 
+  it("follows the swarm barycenter by default and stores later changes", () => {
+    const viewerState = createViewerState(sceneWithIterations(1));
+
+    expect(viewerState.cameraFollowsSwarmBarycenter).toBe(true);
+
+    viewerState.setCameraFollowsSwarmBarycenter(false);
+    expect(viewerState.cameraFollowsSwarmBarycenter).toBe(false);
+
+    viewerState.setCameraFollowsSwarmBarycenter(true);
+    expect(viewerState.cameraFollowsSwarmBarycenter).toBe(true);
+  });
+
   it("clamps mission action numeric values", () => {
     const viewerState = createViewerState(sceneWithIterations(1));
 

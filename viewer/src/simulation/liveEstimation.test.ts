@@ -6,6 +6,7 @@ import {
   solveLiveFusion
 } from "./liveEstimation";
 import { defaultMissionActionState } from "./missionActions";
+import { fallbackMissionActionPositions } from "./missionActionFallback";
 
 const sceneTrace: SceneTrace = {
   schema_version: "0.1.0",
@@ -81,14 +82,33 @@ const sceneTrace: SceneTrace = {
 };
 
 describe("live estimation frame", () => {
-  it("uses mission action state to hold static truth positions", () => {
+  it("uses explicit fallback mission positions to hold static truth positions", () => {
     const actionState = {
       ...defaultMissionActionState(),
       motion: "static" as const,
       randomWalkAmplitudeM: 1
     };
-    const frameAtStart = buildLiveEstimationFrame(sceneTrace, 0, 3, 0.3, actionState);
-    const laterFrame = buildLiveEstimationFrame(sceneTrace, 8, 3, 0.3, actionState);
+    const agentIds = sceneTrace.truth.nodes.map((node) => node.id);
+    const frameAtStart = buildLiveEstimationFrame(
+      sceneTrace,
+      0,
+      3,
+      0.3,
+      actionState,
+      {},
+      [],
+      fallbackMissionActionPositions(agentIds, actionState, 0)
+    );
+    const laterFrame = buildLiveEstimationFrame(
+      sceneTrace,
+      8,
+      3,
+      0.3,
+      actionState,
+      {},
+      [],
+      fallbackMissionActionPositions(agentIds, actionState, 8)
+    );
 
     expect(laterFrame.truthPositions.get("agent_0")).toEqual(
       frameAtStart.truthPositions.get("agent_0")
@@ -98,14 +118,33 @@ describe("live estimation frame", () => {
     );
   });
 
-  it("uses forward mission action state to translate truth and measurements", () => {
+  it("uses explicit fallback forward positions to translate truth and measurements", () => {
     const actionState = {
       ...defaultMissionActionState(),
       motion: "forward" as const,
       speedMps: 2
     };
-    const frameAtStart = buildLiveEstimationFrame(sceneTrace, 0, 3, 0.3, actionState);
-    const laterFrame = buildLiveEstimationFrame(sceneTrace, 3, 3, 0.3, actionState);
+    const agentIds = sceneTrace.truth.nodes.map((node) => node.id);
+    const frameAtStart = buildLiveEstimationFrame(
+      sceneTrace,
+      0,
+      3,
+      0.3,
+      actionState,
+      {},
+      [],
+      fallbackMissionActionPositions(agentIds, actionState, 0)
+    );
+    const laterFrame = buildLiveEstimationFrame(
+      sceneTrace,
+      3,
+      3,
+      0.3,
+      actionState,
+      {},
+      [],
+      fallbackMissionActionPositions(agentIds, actionState, 3)
+    );
 
     expect(laterFrame.truthPositions.get("agent_0")?.[0]).toBeCloseTo(
       (frameAtStart.truthPositions.get("agent_0")?.[0] ?? 0) + 6
@@ -113,6 +152,55 @@ describe("live estimation frame", () => {
     expect(laterFrame.gnssPositions.get("agent_0")?.[0]).toBeCloseTo(
       (laterFrame.truthPositions.get("agent_0")?.[0] ?? 0) + 0.2
     );
+  });
+
+  it("does not compute local mission geometry from action state implicitly", () => {
+    const actionState = {
+      ...defaultMissionActionState(),
+      motion: "forward" as const,
+      speedMps: 2
+    };
+    const baselineFrame = buildLiveEstimationFrame(sceneTrace, 3, 3, 0.3);
+    const actionWithoutPositionsFrame = buildLiveEstimationFrame(
+      sceneTrace,
+      3,
+      3,
+      0.3,
+      actionState
+    );
+
+    expect(actionWithoutPositionsFrame.truthPositions).toEqual(
+      baselineFrame.truthPositions
+    );
+    expect(actionWithoutPositionsFrame.uwbLinks).toEqual(baselineFrame.uwbLinks);
+  });
+
+  it("uses backend mission positions when supplied and keeps GNSS offsets local", () => {
+    const actionState = {
+      ...defaultMissionActionState(),
+      motion: "forward" as const,
+      speedMps: 2
+    };
+    const backendPositions = new Map([
+      ["agent_0", [10, 0, 5] as [number, number, number]],
+      ["agent_1", [14, 0, 5] as [number, number, number]],
+      ["agent_2", [10, 0, 9] as [number, number, number]]
+    ]);
+
+    const frame = buildLiveEstimationFrame(
+      sceneTrace,
+      3,
+      3,
+      0.3,
+      actionState,
+      {},
+      [],
+      backendPositions
+    );
+
+    expect(frame.truthPositions.get("agent_0")).toEqual([10, 0, 5]);
+    expect(frame.gnssPositions.get("agent_0")).toEqual([10.2, 0, 5.1]);
+    expect(frame.uwbLinks[0].measuredDistanceM).toBeCloseTo(4);
   });
 
   it("moves truth and derives GNSS from the moved truth plus original GNSS error", () => {
@@ -366,10 +454,39 @@ describe("live estimation frame", () => {
       formation: "ring" as const,
       motion: "static" as const
     };
+    const agentIds = ringTrace.truth.nodes.map((node) => node.id);
+    const ringPositions = fallbackMissionActionPositions(agentIds, ringAction, 0);
 
-    const sparseFrame = buildLiveEstimationFrame(ringTrace, 0, 4, 0, ringAction);
-    const denseFrame = buildLiveEstimationFrame(ringTrace, 0, 7, 0, ringAction);
-    const overRequestedFrame = buildLiveEstimationFrame(ringTrace, 0, 12, 0, ringAction);
+    const sparseFrame = buildLiveEstimationFrame(
+      ringTrace,
+      0,
+      4,
+      0,
+      ringAction,
+      {},
+      [],
+      ringPositions
+    );
+    const denseFrame = buildLiveEstimationFrame(
+      ringTrace,
+      0,
+      7,
+      0,
+      ringAction,
+      {},
+      [],
+      ringPositions
+    );
+    const overRequestedFrame = buildLiveEstimationFrame(
+      ringTrace,
+      0,
+      12,
+      0,
+      ringAction,
+      {},
+      [],
+      ringPositions
+    );
     const overRequestedKeys = overRequestedFrame.uwbLinks.map((link) => (
       [link.sourceId, link.targetId].sort().join("::")
     ));

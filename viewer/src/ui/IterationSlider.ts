@@ -8,7 +8,9 @@ export interface IterationSliderProps {
 export function createIterationSlider(props: IterationSliderProps): HTMLElement {
   const label = document.createElement("label");
   label.className = "iteration-slider";
-  label.textContent = "iteration";
+  const labelText = document.createElement("span");
+  labelText.className = "control-label";
+  labelText.textContent = "iteration";
 
   const slider = document.createElement("input");
   slider.type = "range";
@@ -19,6 +21,6 @@ export function createIterationSlider(props: IterationSliderProps): HTMLElement 
     props.onChange(Number(slider.value));
   });
 
-  label.append(slider);
+  label.append(labelText, slider);
   return label;
 }

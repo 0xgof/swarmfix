@@ -3,10 +3,16 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import { loadSceneTrace } from "../data/loadSceneTrace";
 import type { SceneTrace } from "../data/sceneTypes";
+import type { Position3D } from "../animation/liveMotion";
 import {
   buildInitialLiveSolveResponse,
   buildLiveSolveRequest
 } from "../live/liveSolveTypes";
+import {
+  requestMissionActionCatalog,
+  type MissionActionCatalog
+} from "../live/missionActionCatalogClient";
+import { requestMissionActionPositions } from "../live/missionActionPositionsClient";
 import { defaultLiveSolveEndpoint, requestLiveSolve } from "../live/liveSolverClient";
 import { LiveSolveScheduler } from "../live/liveSolveScheduler";
 import {
@@ -30,6 +36,7 @@ import { createSwarmScene } from "../scene/createScene";
 import { disposeSceneGraph } from "../scene/disposeScene";
 import { buildLiveEstimationFrame } from "../simulation/liveEstimation";
 import type { LiveEstimationFrame } from "../simulation/liveEstimation";
+import { fallbackMissionActionPositions } from "../simulation/missionActionFallback";
 import {
   createViewerState,
   maxUwbLinksPerAgentLimit,
@@ -44,6 +51,7 @@ import {
   createLinkCountControl,
   updateLinkCountDiagnostics
 } from "../ui/LinkCountControl";
+import { createCameraFollowControl } from "../ui/CameraFollowControl";
 import { createMissionActionControls } from "../ui/MissionActionControls";
 import { createSidePanel } from "../ui/SidePanel";
 import { getCostBreakdown } from "../ui/CostBreakdownPanel";
@@ -68,6 +76,30 @@ const layerLabels: Record<keyof LayerVisibility, string> = {
   residuals: "residuals",
   cost: "cost"
 };
+const CAMERA_FOLLOW_PADDING = 1.35;
+const CAMERA_FOLLOW_MIN_DISTANCE_M = 8.0;
+const CAMERA_FOLLOW_ZOOM_BEZIER_STEP = 0.38;
+const CAMERA_FOLLOW_EPSILON_M = 0.001;
+const CAMERA_FOLLOW_MANUAL_ZOOM_EPSILON_M = 0.05;
+const MISSION_ACTION_POSITION_REQUEST_INTERVAL_S = 1 / 30;
+type MissionPositionSource = "backend" | "local_fallback";
+const CAMERA_FOLLOW_FALLBACK_DIRECTION = (() => {
+  const x = 1.0;
+  const y = 12.0;
+  const z = 19.0;
+  const length = Math.hypot(x, y, z);
+  const direction = [x / length, y / length, z / length] as const;
+  return direction;
+})();
+
+function cubicBezierEaseInOut(progress: number): number {
+  const clampedProgress = Math.min(1.0, Math.max(0.0, progress));
+  const easedProgress = (
+    3.0 * clampedProgress ** 2
+    - 2.0 * clampedProgress ** 3
+  );
+  return easedProgress;
+}
 
 export class App {
   private root: HTMLElement;
@@ -92,6 +124,12 @@ export class App {
   private previousSelectedUwbLinks: LiveEstimationFrame["uwbLinks"];
   private latestUwbSelection: LiveEstimationFrame["uwbSelection"] | null;
   private linkCountControl: HTMLElement | null = null;
+  private cameraFollowDistanceM: number | null;
+  private missionActionControlsHost: HTMLElement | null;
+  private latestBackendMissionPositions: Map<string, Position3D> | null;
+  private missionPositionSource: MissionPositionSource;
+  private missionPositionRequestInFlight: boolean;
+  private lastMissionPositionRequestAtS: number | null;
 
   constructor(root: HTMLElement,
               sceneUrl = "/examples/full_workflow_demo.json") {
@@ -125,6 +163,12 @@ export class App {
     this.connectionBadge = null;
     this.previousSelectedUwbLinks = [];
     this.latestUwbSelection = null;
+    this.cameraFollowDistanceM = null;
+    this.missionActionControlsHost = null;
+    this.latestBackendMissionPositions = null;
+    this.missionPositionSource = "local_fallback";
+    this.missionPositionRequestInFlight = false;
+    this.lastMissionPositionRequestAtS = null;
   }
 
   getCameraForTest(): ReturnType<typeof createCamera> | null {
@@ -163,6 +207,12 @@ export class App {
     this.lastRenderedConnectionStatus = null;
     this.previousSelectedUwbLinks = [];
     this.latestUwbSelection = null;
+    this.cameraFollowDistanceM = null;
+    this.missionActionControlsHost = null;
+    this.latestBackendMissionPositions = null;
+    this.missionPositionSource = "local_fallback";
+    this.missionPositionRequestInFlight = false;
+    this.lastMissionPositionRequestAtS = null;
     const initialLiveFrame = buildLiveEstimationFrame(
       sceneTrace,
       0,
@@ -231,23 +281,18 @@ export class App {
       }
     });
     panel.append(this.linkCountControl);
-    panel.append(createMissionActionControls({
-      value: this.viewerState.missionAction,
-      onChange: (nextAction) => {
-        const timeSeconds = (performance.now() - this.startedAtMs) / 1000;
-        const previousFormation = this.viewerState!.missionAction.formation;
-        this.viewerState!.setMissionAction(nextAction, timeSeconds);
-        if (nextAction.formation && nextAction.formation !== previousFormation) {
-          this.previousSelectedUwbLinks = [];
-        }
-        this.recordViewerEvent(
-          "viewer_mission_action_changed",
-          "viewer-mission-action",
-          this.actionContextFields()
-        );
+    panel.append(createCameraFollowControl({
+      followsBarycenter: this.viewerState.cameraFollowsSwarmBarycenter,
+      onChange: (followsBarycenter) => {
+        this.viewerState!.setCameraFollowsSwarmBarycenter(followsBarycenter);
         this.refreshScene();
       }
     }));
+    this.missionActionControlsHost = document.createElement("section");
+    this.missionActionControlsHost.className = "mission-action-controls-host";
+    panel.append(this.missionActionControlsHost);
+    this.renderMissionActionControls();
+    void this.loadMissionActionCatalog();
     const inspector = document.createElement("section");
     inspector.className = "inspector";
     panel.append(inspector);
@@ -303,6 +348,51 @@ export class App {
     return items;
   }
 
+  private renderMissionActionControls(catalog?: MissionActionCatalog): void {
+    if (!this.viewerState || !this.missionActionControlsHost) {
+      return;
+    }
+
+    const controls = createMissionActionControls({
+      value: this.viewerState.missionAction,
+      catalog,
+      onChange: (nextAction) => {
+        const timeSeconds = (performance.now() - this.startedAtMs) / 1000;
+        const previousFormation = this.viewerState!.missionAction.formation;
+        this.viewerState!.setMissionAction(nextAction, timeSeconds);
+        this.lastMissionPositionRequestAtS = null;
+        if (nextAction.formation && nextAction.formation !== previousFormation) {
+          this.previousSelectedUwbLinks = [];
+        }
+        this.recordViewerEvent(
+          "viewer_mission_action_changed",
+          "viewer-mission-action",
+          this.actionContextFields()
+        );
+        this.refreshScene();
+      }
+    });
+    this.missionActionControlsHost.innerHTML = "";
+    this.missionActionControlsHost.append(controls);
+  }
+
+  private async loadMissionActionCatalog(): Promise<void> {
+    const controlHost = this.missionActionControlsHost;
+    if (!controlHost) {
+      return;
+    }
+
+    try {
+      const catalog = await requestMissionActionCatalog();
+      if (this.missionActionControlsHost !== controlHost) {
+        return;
+      }
+      this.renderMissionActionControls(catalog);
+    } catch {
+      return;
+    }
+  }
+
   private refreshScene(): void {
     if (!this.viewerState) {
       return;
@@ -322,6 +412,7 @@ export class App {
       this.viewerState.missionAction,
       liveFrame
     );
+    this.updateCameraFollowTarget(liveFrame);
     this.replaceScene(nextScene);
     this.renderInspector();
   }
@@ -353,6 +444,7 @@ export class App {
         this.viewerState.missionAction,
         liveFrame
       );
+      this.updateCameraFollowTarget(liveFrame);
       this.replaceScene(nextScene);
       this.controls?.update();
       this.renderer.render(nextScene, this.camera);
@@ -403,6 +495,12 @@ export class App {
     this.panel = null;
     this.connectionBadge = null;
     this.linkCountControl = null;
+    this.cameraFollowDistanceM = null;
+    this.missionActionControlsHost = null;
+    this.latestBackendMissionPositions = null;
+    this.missionPositionSource = "local_fallback";
+    this.missionPositionRequestInFlight = false;
+    this.lastMissionPositionRequestAtS = null;
   }
 
   private linkCountDiagnostics(): {
@@ -427,6 +525,8 @@ export class App {
       return null;
     }
 
+    this.requestBackendMissionPositions(timeSeconds);
+    const missionPositions = this.missionPositionsForLiveFrame(timeSeconds);
     const liveFrame = buildLiveEstimationFrame(
       this.viewerState.sceneTrace,
       timeSeconds,
@@ -434,7 +534,8 @@ export class App {
       this.viewerState.motionAmplitudeM,
       this.viewerState.missionAction,
       {},
-      this.previousSelectedUwbLinks
+      this.previousSelectedUwbLinks,
+      missionPositions
     );
     this.previousSelectedUwbLinks = liveFrame.uwbLinks;
     this.latestUwbSelection = liveFrame.uwbSelection;
@@ -461,6 +562,160 @@ export class App {
       return request;
     });
     return liveFrame;
+  }
+
+  private missionPositionsForLiveFrame(timeSeconds: number): Map<string, Position3D> {
+    if (!this.viewerState) {
+      return new Map();
+    }
+
+    if (this.latestBackendMissionPositions) {
+      this.missionPositionSource = "backend";
+      return this.latestBackendMissionPositions;
+    }
+
+    this.missionPositionSource = "local_fallback";
+    const agentIds = this.viewerState.sceneTrace.truth.nodes.map((node) => node.id);
+    const fallbackPositions = fallbackMissionActionPositions(
+      agentIds,
+      this.viewerState.missionAction,
+      timeSeconds
+    );
+    return fallbackPositions;
+  }
+
+  private requestBackendMissionPositions(timeSeconds: number): void {
+    if (!this.viewerState || this.missionPositionRequestInFlight) {
+      return;
+    }
+
+    if (
+      this.lastMissionPositionRequestAtS !== null
+      && timeSeconds - this.lastMissionPositionRequestAtS
+        < MISSION_ACTION_POSITION_REQUEST_INTERVAL_S
+    ) {
+      return;
+    }
+
+    const agentIds = this.viewerState.sceneTrace.truth.nodes.map((node) => node.id);
+    const missionAction = this.viewerState.missionAction;
+    const requestActionKey = this.missionActionCacheKey();
+    this.missionPositionRequestInFlight = true;
+    this.lastMissionPositionRequestAtS = timeSeconds;
+    void requestMissionActionPositions(agentIds, missionAction, timeSeconds)
+      .then((positions) => {
+        if (!this.viewerState || this.missionActionCacheKey() !== requestActionKey) {
+          return;
+        }
+        this.latestBackendMissionPositions = positions;
+        this.refreshScene();
+      })
+      .catch(() => {
+        if (!this.latestBackendMissionPositions) {
+          this.missionPositionSource = "local_fallback";
+        }
+      })
+      .finally(() => {
+        this.missionPositionRequestInFlight = false;
+      });
+  }
+
+  private missionActionCacheKey(): string {
+    if (!this.viewerState) {
+      return "";
+    }
+
+    const key = JSON.stringify(this.viewerState.missionAction);
+    return key;
+  }
+
+  private updateCameraFollowTarget(liveFrame: LiveEstimationFrame | null): void {
+    if (!this.viewerState?.cameraFollowsSwarmBarycenter) {
+      this.cameraFollowDistanceM = null;
+      return;
+    }
+
+    if (
+      !this.controls
+      || !this.camera
+      || !liveFrame
+      || liveFrame.truthPositions.size === 0
+    ) {
+      return;
+    }
+
+    let sumX = 0;
+    let sumY = 0;
+    let sumZ = 0;
+    for (const position of liveFrame.truthPositions.values()) {
+      sumX += position[0];
+      sumY += position[1];
+      sumZ += position[2];
+    }
+
+    const count = liveFrame.truthPositions.size;
+    const barycenterX = sumX / count;
+    const barycenterY = sumY / count;
+    const barycenterZ = sumZ / count;
+    let swarmRadiusM = 0;
+    for (const position of liveFrame.truthPositions.values()) {
+      const distanceFromBarycenterM = Math.hypot(
+        position[0] - barycenterX,
+        position[1] - barycenterY,
+        position[2] - barycenterZ
+      );
+      swarmRadiusM = Math.max(swarmRadiusM, distanceFromBarycenterM);
+    }
+
+    const currentOffsetX = this.camera.position.x - this.controls.target.x;
+    const currentOffsetY = this.camera.position.y - this.controls.target.y;
+    const currentOffsetZ = this.camera.position.z - this.controls.target.z;
+    const currentDistanceM = Math.hypot(currentOffsetX, currentOffsetY, currentOffsetZ);
+    const cameraDirection = currentDistanceM > CAMERA_FOLLOW_EPSILON_M
+      ? [
+        currentOffsetX / currentDistanceM,
+        currentOffsetY / currentDistanceM,
+        currentOffsetZ / currentDistanceM
+      ] as const
+      : CAMERA_FOLLOW_FALLBACK_DIRECTION;
+    const verticalFovRad = this.camera.fov * Math.PI / 180.0;
+    const horizontalFovRad = 2.0 * Math.atan(
+      Math.tan(verticalFovRad / 2.0) * this.camera.aspect
+    );
+    const limitingFovRad = Math.min(verticalFovRad, horizontalFovRad);
+    const fitDistanceM = Math.max(
+      CAMERA_FOLLOW_MIN_DISTANCE_M,
+      swarmRadiusM * CAMERA_FOLLOW_PADDING / Math.sin(limitingFovRad / 2.0)
+    );
+    const followDistanceM = this.nextCameraFollowDistance(fitDistanceM, currentDistanceM);
+
+    this.controls.target.set(barycenterX, barycenterY, barycenterZ);
+    this.camera.position.set(
+      barycenterX + cameraDirection[0] * followDistanceM,
+      barycenterY + cameraDirection[1] * followDistanceM,
+      barycenterZ + cameraDirection[2] * followDistanceM
+    );
+    this.camera.lookAt(barycenterX, barycenterY, barycenterZ);
+  }
+
+  private nextCameraFollowDistance(fitDistanceM: number,
+                                   currentDistanceM: number): number {
+    const storedDistanceM = this.cameraFollowDistanceM;
+    const currentFollowDistanceM = (
+      storedDistanceM !== null
+      && Math.abs(currentDistanceM - storedDistanceM) <= CAMERA_FOLLOW_MANUAL_ZOOM_EPSILON_M
+    )
+      ? storedDistanceM
+      : currentDistanceM;
+    const distanceDeltaM = fitDistanceM - currentFollowDistanceM;
+    if (Math.abs(distanceDeltaM) <= CAMERA_FOLLOW_EPSILON_M) {
+      this.cameraFollowDistanceM = fitDistanceM;
+    } else {
+      const smoothingProgress = cubicBezierEaseInOut(CAMERA_FOLLOW_ZOOM_BEZIER_STEP);
+      this.cameraFollowDistanceM = currentFollowDistanceM + distanceDeltaM * smoothingProgress;
+    }
+
+    return this.cameraFollowDistanceM;
   }
 
   private async requestLiveSolveWithObservability(request: Parameters<typeof requestLiveSolve>[0]) {
@@ -630,6 +885,7 @@ export class App {
       motion_mode: action.motion,
       speed_mps: action.speedMps,
       random_walk_amplitude_m: action.randomWalkAmplitudeM,
+      mission_position_source: this.missionPositionSource,
       max_uwb_links_per_agent: this.viewerState?.maxUwbLinksPerAgent ?? 0
     };
     return fields;

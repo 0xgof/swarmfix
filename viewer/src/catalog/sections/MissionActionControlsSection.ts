@@ -1,4 +1,5 @@
 import { defaultMissionActionState } from "../../simulation/missionActions";
+import { fallbackMissionActionCatalog } from "../../live/missionActionCatalogClient";
 import { createMissionActionControls } from "../../ui/MissionActionControls";
 import { createCatalogSection } from "../CatalogSection";
 
@@ -14,6 +15,7 @@ export function createMissionActionControlsSection(): HTMLElement {
   };
   const controls = createMissionActionControls({
     value: actionState,
+    catalog: fallbackMissionActionCatalog,
     onChange: (nextState) => {
       actionState = nextState;
       renderReadout();

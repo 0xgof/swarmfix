@@ -4,27 +4,16 @@ import {
   type MissionActionState,
   type MotionMode
 } from "../simulation/missionActions";
+import {
+  fallbackMissionActionCatalog,
+  type MissionActionCatalog
+} from "../live/missionActionCatalogClient";
 
 export interface MissionActionControlsProps {
   value: MissionActionState;
+  catalog?: MissionActionCatalog;
   onChange: (nextValue: MissionActionState) => void;
 }
-
-const formationOptions: Array<{ value: FormationMode; label: string }> = [
-  { value: "grid", label: "grid" },
-  { value: "line", label: "line" },
-  { value: "column", label: "column" },
-  { value: "wedge", label: "wedge" },
-  { value: "ring", label: "ring" },
-  { value: "random_cloud", label: "random cloud" }
-];
-
-const motionOptions: Array<{ value: MotionMode; label: string }> = [
-  { value: "static", label: "static" },
-  { value: "random_walk", label: "random walk" },
-  { value: "forward", label: "forward" },
-  { value: "path_follow", label: "path follow" }
-];
 
 function optionElement(value: string,
                        label: string): HTMLOptionElement {
@@ -58,20 +47,21 @@ function row(labelText: string,
 
 export function createMissionActionControls(props: MissionActionControlsProps): HTMLElement {
   let currentValue = normalizeMissionActionState(props.value);
+  const catalog = props.catalog ?? fallbackMissionActionCatalog;
   const container = document.createElement("div");
   container.className = "mission-action-controls";
 
   const formationSelect = document.createElement("select");
   formationSelect.name = "formation";
-  for (const option of formationOptions) {
-    formationSelect.append(optionElement(option.value, option.label));
+  for (const option of catalog.formations) {
+    formationSelect.append(optionElement(option.id, option.label));
   }
   formationSelect.value = currentValue.formation;
 
   const motionSelect = document.createElement("select");
   motionSelect.name = "motion";
-  for (const option of motionOptions) {
-    motionSelect.append(optionElement(option.value, option.label));
+  for (const option of catalog.motions) {
+    motionSelect.append(optionElement(option.id, option.label));
   }
   motionSelect.value = currentValue.motion;
 

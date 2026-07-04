@@ -7,6 +7,7 @@ import {
   updateLinkCountDiagnostics
 } from "./LinkCountControl";
 import { createMissionActionControls } from "./MissionActionControls";
+import { fallbackMissionActionCatalog } from "../live/missionActionCatalogClient";
 import { defaultMissionActionState } from "../simulation/missionActions";
 
 describe("props-based viewer controls", () => {
@@ -113,5 +114,42 @@ describe("props-based viewer controls", () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ motion: "forward" }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ speedMps: 3.5 }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ randomWalkAmplitudeM: 0 }));
+  });
+
+  it("MissionActionControls renders formation and motion options from catalog data", () => {
+    const element = createMissionActionControls({
+      value: defaultMissionActionState(),
+      catalog: {
+        ...fallbackMissionActionCatalog,
+        formations: [{
+          id: "ring",
+          label: "backend ring",
+          description: "backend ring option",
+          parameters: [],
+          geometryTraits: ["planar"],
+          solverGeometryRisk: "low"
+        }],
+        motions: [{
+          id: "static",
+          label: "backend static",
+          description: "backend static option",
+          parameters: [],
+          geometryTraits: [],
+          solverGeometryRisk: "low"
+        }]
+      },
+      onChange: vi.fn()
+    });
+    const formationOptions = Array.from(
+      element.querySelectorAll<HTMLOptionElement>('[name="formation"] option')
+    );
+    const motionOptions = Array.from(
+      element.querySelectorAll<HTMLOptionElement>('[name="motion"] option')
+    );
+
+    expect(formationOptions.map((option) => option.value)).toEqual(["ring"]);
+    expect(formationOptions.map((option) => option.textContent)).toEqual(["backend ring"]);
+    expect(motionOptions.map((option) => option.value)).toEqual(["static"]);
+    expect(motionOptions.map((option) => option.textContent)).toEqual(["backend static"]);
   });
 });

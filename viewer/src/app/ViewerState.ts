@@ -25,6 +25,7 @@ export interface ViewerState {
   playbackSpeed: number;
   maxUwbLinksPerAgent: number;
   motionAmplitudeM: number;
+  cameraFollowsSwarmBarycenter: boolean;
   missionAction: MissionActionState;
   layers: LayerVisibility;
   selectedNodeId: string | null;
@@ -34,6 +35,7 @@ export interface ViewerState {
   setLayerVisible: (layer: keyof LayerVisibility, visible: boolean) => void;
   setMaxUwbLinksPerAgent: (linkCount: number) => void;
   setMotionAmplitude: (motionAmplitudeM: number) => void;
+  setCameraFollowsSwarmBarycenter: (followsBarycenter: boolean) => void;
   setMissionAction: (update: Partial<MissionActionState>, timeSeconds?: number) => void;
   selectNode: (agentId: string | null) => void;
   selectEdge: (edgeKey: string | null) => void;
@@ -80,6 +82,7 @@ export function createViewerState(sceneTrace: SceneTrace): ViewerState {
     playbackSpeed: 1,
     maxUwbLinksPerAgent: Math.min(linkLimit, maxObservedUwbDegree),
     motionAmplitudeM: 0.24,
+    cameraFollowsSwarmBarycenter: true,
     missionAction: defaultMissionActionState(),
     layers: {
       truth: true,
@@ -119,6 +122,9 @@ export function createViewerState(sceneTrace: SceneTrace): ViewerState {
     },
     setMotionAmplitude(motionAmplitudeM: number): void {
       state.motionAmplitudeM = Math.max(0, motionAmplitudeM);
+    },
+    setCameraFollowsSwarmBarycenter(followsBarycenter: boolean): void {
+      state.cameraFollowsSwarmBarycenter = followsBarycenter;
     },
     setMissionAction(update: Partial<MissionActionState>, timeSeconds = 0): void {
       const currentFormation = state.missionAction.formation;

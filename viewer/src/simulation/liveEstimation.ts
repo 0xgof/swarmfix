@@ -5,7 +5,7 @@ import {
 } from "../animation/liveMotion";
 import type { SceneTrace } from "../data/sceneTypes";
 import type { UwbMeasurement } from "../data/sceneTypes";
-import { missionActionPositions, type MissionActionState } from "./missionActions";
+import type { MissionActionState } from "./missionActions";
 import {
   selectLiveUwbLinks,
   type LiveUwbSelectionDiagnostics,
@@ -137,17 +137,16 @@ export function buildLiveEstimationFrame(sceneTrace: SceneTrace,
                                          timeSeconds: number,
                                          maxUwbLinksPerAgent: number,
                                          motionAmplitudeM: number,
-                                         missionAction: MissionActionState | null = null,
+                                         _missionAction: MissionActionState | null = null,
                                          selectionOverrides: LiveUwbSelectionOverrides = {},
-                                         previousSelectedLinks: SelectedLiveUwbLink[] = []): LiveEstimationFrame {
+                                         previousSelectedLinks: SelectedLiveUwbLink[] = [],
+                                         suppliedMissionPositions: Map<string, Position3D> | null = null): LiveEstimationFrame {
   const nominalTruth = nominalTruthPositions(sceneTrace);
   const gnssOffsets = gnssOffsetByAgent(sceneTrace);
   const truthPositions = new Map<string, Position3D>();
   const gnssPositions = new Map<string, Position3D>();
   const gnssSigma = new Map<string, number>();
-  const actionTruthPositions = missionAction
-    ? missionActionPositions([...nominalTruth.keys()], missionAction, timeSeconds)
-    : null;
+  const actionTruthPositions = suppliedMissionPositions;
 
   for (const [agentId, nominalPosition] of nominalTruth.entries()) {
     const truthPosition = actionTruthPositions?.get(agentId) ?? animatedSwarmPosition(

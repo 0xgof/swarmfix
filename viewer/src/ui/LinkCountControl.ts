@@ -25,7 +25,9 @@ function diagnosticsText(diagnostics: LinkCountProps["diagnostics"]): string {
 export function createLinkCountControl(props: LinkCountProps): HTMLElement {
   const label = document.createElement("label");
   label.className = "link-count-control";
-  label.textContent = "UWB links per drone";
+  const labelText = document.createElement("span");
+  labelText.className = "control-label";
+  labelText.textContent = "UWB links per drone";
 
   const slider = document.createElement("input");
   slider.type = "range";
@@ -34,6 +36,7 @@ export function createLinkCountControl(props: LinkCountProps): HTMLElement {
   slider.value = String(props.value);
 
   const value = document.createElement("span");
+  value.className = "link-count-value";
   value.textContent = String(props.value);
   const diagnostics = document.createElement("span");
   diagnostics.className = "link-count-diagnostics";
@@ -43,7 +46,7 @@ export function createLinkCountControl(props: LinkCountProps): HTMLElement {
     props.onChange(Number(slider.value));
   });
 
-  label.append(slider, value, diagnostics);
+  label.append(labelText, slider, value, diagnostics);
   return label;
 }
 
