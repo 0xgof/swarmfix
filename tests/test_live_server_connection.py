@@ -62,6 +62,24 @@ def test_live_server_health_endpoint_rejects_post() -> None:
     assert status_code == 405
 
 
+def test_live_server_does_not_expose_backend_live_frame_sensor_generation() -> None:
+    """Mission frames must not bypass the canonical GNSS and UWB sensor modules."""
+    server, base_url = _serve_for_test()
+    request = Request(f"{base_url}/live/frame", method="POST")
+    try:
+        try:
+            urlopen(request, timeout=2)
+        except HTTPError as error:
+            status_code = error.code
+        else:
+            status_code = 200
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert status_code == 404
+
+
 def test_pyproject_declares_live_solver_console_script() -> None:
     """Local development should expose a direct live-solver startup command."""
     with open("pyproject.toml", "rb") as pyproject_file:

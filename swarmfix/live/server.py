@@ -16,7 +16,11 @@ from swarmfix.estimation.solver_backend import (
     SolverBackend,
     get_solver_backend,
 )
-from swarmfix.live.models import LiveSolveRequest
+from swarmfix.live.mission_action_api import (
+    build_catalog_response,
+    build_positions_response,
+)
+from swarmfix.live.models import LiveSolveRequest, MissionActionPositionsRequest
 from swarmfix.live.solve_request import solve_live_request
 from swarmfix.observability.sink import JsonlSink, NoOpSink, ObservationSink
 
@@ -39,15 +43,20 @@ class LiveSolveHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         """Expose a cheap health check for viewer connection state."""
-        if self.path != "/health":
-            self._write_json(404, {"error": "not found"})
+        if self.path == "/health":
+            self._write_json(200, {
+                "status": "ok",
+                "service": "swarmfix-live-solver",
+                "schema_version": "0.1.0",
+            })
             return
 
-        self._write_json(200, {
-            "status": "ok",
-            "service": "swarmfix-live-solver",
-            "schema_version": "0.1.0",
-        })
+        if self.path == "/mission-actions/catalog":
+            response = build_catalog_response()
+            self._write_json(200, response.model_dump(mode="json"))
+            return
+
+        self._write_json(404, {"error": "not found"})
 
     def do_OPTIONS(self) -> None:
         """Return CORS preflight headers for browser clients."""
@@ -57,6 +66,16 @@ class LiveSolveHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         """Run one live solve request or return a validation error."""
+        if self.path == "/mission-actions/positions":
+            try:
+                body = self._read_json_body()
+                request = MissionActionPositionsRequest.model_validate(body)
+                response = build_positions_response(request)
+                self._write_json(200, response.model_dump(mode="json"))
+            except (json.JSONDecodeError, ValidationError, ValueError) as error:
+                self._write_json(400, {"error": str(error)})
+            return
+
         if self.path == "/health":
             self._discard_request_body()
             self._write_json(405, {"error": "method not allowed"})

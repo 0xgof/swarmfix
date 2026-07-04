@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 from swarmfix.observability.events import TraceContext
+from swarmfix.scenarios.mission_actions import (
+    FormationMode,
+    MissionActionOption,
+    MissionActionState,
+    MotionMode,
+)
 
 
 class LiveAgentState(BaseModel):
@@ -98,6 +105,56 @@ class LiveSolveRequest(BaseModel):
         if self.dimension <= 0:
             raise ValueError("dimension must be positive")
         return self
+
+
+class MissionActionCatalogResponse(BaseModel):
+    """Catalog response for viewer mission-action controls."""
+
+    schema_version: str = "0.1.0"
+    formations: list[MissionActionOption]
+    motions: list[MissionActionOption]
+
+
+class MissionActionPositionsRequest(BaseModel):
+    """Request for mission-action positions without sensor or solver output."""
+
+    agent_ids: list[str]
+    time_s: float
+    mission_action: MissionActionState = Field(default_factory=MissionActionState)
+
+    @model_validator(mode="after")
+    def validate_request_shape(self) -> MissionActionPositionsRequest:
+        """Reject invalid position-generation requests."""
+        if not self.agent_ids:
+            raise ValueError("agent_ids must not be empty")
+        if not math.isfinite(self.time_s):
+            raise ValueError("time_s must be finite")
+        if any(not agent_id for agent_id in self.agent_ids):
+            raise ValueError("agent_ids must not contain blank ids")
+        return self
+
+
+class MissionActionPosition(BaseModel):
+    """One generated mission-action position."""
+
+    agent_id: str
+    position_m: tuple[float, ...]
+
+
+class MissionActionPositionsMetadata(BaseModel):
+    """Metadata for mission-action position generation."""
+
+    formation: FormationMode
+    motion: MotionMode
+    time_s: float
+
+
+class MissionActionPositionsResponse(BaseModel):
+    """Positions-only response for backend mission actions."""
+
+    schema_version: str = "0.1.0"
+    metadata: MissionActionPositionsMetadata
+    positions: list[MissionActionPosition]
 
 
 class LivePositionEstimate(BaseModel):
