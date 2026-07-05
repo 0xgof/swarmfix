@@ -88,8 +88,8 @@ export function maxUwbLinksPerAgentLimit(sceneTrace: SceneTrace): number {
 }
 
 export function createViewerState(sceneTrace: SceneTrace): ViewerState {
-  const linkLimit = maxUwbLinksPerAgentLimit(sceneTrace);
   const initialMissionDroneCount = clampMissionDroneCount(sceneTrace.truth.nodes.length);
+  const initialLinkLimit = maxUwbLinksForDroneCount(initialMissionDroneCount);
   const maxObservedUwbDegree = Math.max(
     0,
     ...sceneTrace.measurements.uwb.flatMap((link) => [
@@ -106,7 +106,7 @@ export function createViewerState(sceneTrace: SceneTrace): ViewerState {
     selectedIteration: 0,
     playbackSpeed: 1,
     missionDroneCount: initialMissionDroneCount,
-    maxUwbLinksPerAgent: Math.min(linkLimit, maxObservedUwbDegree),
+    maxUwbLinksPerAgent: Math.min(initialLinkLimit, maxObservedUwbDegree),
     motionAmplitudeM: 0.24,
     cameraFollowsSwarmBarycenter: true,
     missionAction: defaultMissionActionState(),
@@ -142,9 +142,10 @@ export function createViewerState(sceneTrace: SceneTrace): ViewerState {
     },
     setMissionDroneCount(droneCount: number): void {
       state.missionDroneCount = clampMissionDroneCount(droneCount);
+      const linkLimit = maxUwbLinksForDroneCount(state.missionDroneCount);
       state.maxUwbLinksPerAgent = Math.min(
         state.maxUwbLinksPerAgent,
-        maxUwbLinksForDroneCount(state.missionDroneCount)
+        linkLimit
       );
       if (state.selectedNodeId !== null) {
         const activeAgentIds = new Set(createMissionAgentIds(state.missionDroneCount));
@@ -154,6 +155,7 @@ export function createViewerState(sceneTrace: SceneTrace): ViewerState {
       }
     },
     setMaxUwbLinksPerAgent(linkCount: number): void {
+      const linkLimit = maxUwbLinksForDroneCount(state.missionDroneCount);
       state.maxUwbLinksPerAgent = Math.min(
         linkLimit,
         Math.max(0, Math.floor(linkCount))

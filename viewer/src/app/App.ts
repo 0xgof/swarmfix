@@ -33,16 +33,18 @@ import { flushObservationEvents } from "../observability/eventFlush";
 import { PerformanceMonitor } from "../observability/performance/PerformanceMonitor";
 import { flushPerformanceSamples } from "../observability/performance/performanceFlush";
 import { createCamera } from "../scene/camera";
-import { createSwarmScene } from "../scene/createScene";
-import { disposeSceneGraph } from "../scene/disposeScene";
+import { SwarmSceneRuntime } from "../scene/SwarmSceneRuntime";
 import { buildLiveEstimationFrame } from "../simulation/liveEstimation";
 import type { LiveEstimationFrame } from "../simulation/liveEstimation";
-import { publishNewtonSharedState } from "../newton/newtonSharedState";
+import {
+  NEWTON_DIAGNOSTICS_STORAGE_KEY,
+  publishNewtonSharedState
+} from "../newton/newtonSharedState";
 import { fallbackMissionActionPositions } from "../simulation/missionActionFallback";
 import {
   createViewerState,
   createMissionAgentIds,
-  maxUwbLinksPerAgentLimit,
+  maxUwbLinksForDroneCount,
   type LayerVisibility,
   type ViewerState
 } from "./ViewerState";
@@ -75,7 +77,9 @@ const CAMERA_FOLLOW_MIN_DISTANCE_M = 8.0;
 const CAMERA_FOLLOW_ZOOM_BEZIER_STEP = 0.38;
 const CAMERA_FOLLOW_EPSILON_M = 0.001;
 const CAMERA_FOLLOW_MANUAL_ZOOM_EPSILON_M = 0.05;
-const MISSION_ACTION_POSITION_REQUEST_INTERVAL_S = 1 / 30;
+const FAST_MISSION_POSITION_REQUEST_INTERVAL_S = 1 / 30;
+const STATIC_MISSION_POSITION_REQUEST_INTERVAL_S = 1.0;
+const OBSERVABILITY_FLUSH_INTERVAL_MS = 1000;
 type MissionPositionSource = "backend" | "local_fallback";
 const CAMERA_FOLLOW_FALLBACK_DIRECTION = (() => {
   const x = 1.0;
@@ -106,6 +110,7 @@ export class App {
   private controls: OrbitControls | null;
   private camera: ReturnType<typeof createCamera> | null;
   private scene: Scene | null;
+  private sceneRuntime: SwarmSceneRuntime | null;
   private startedAtMs: number;
   private liveSolveScheduler: LiveSolveScheduler;
   private observabilitySession: ViewerObservabilitySession;
@@ -124,8 +129,11 @@ export class App {
   private latestBackendMissionPositions: Map<string, Position3D> | null;
   private missionPositionSource: MissionPositionSource;
   private missionPositionRequestInFlight: boolean;
+  private pendingMissionPositionRequestAtS: number | null;
   private lastMissionPositionRequestAtS: number | null;
   private latestLiveSolveRequest: LiveSolveRequest | null;
+  private lastObservabilityFlushAtMs: number;
+  private lastRenderedConnectionKey: string | null;
 
   constructor(root: HTMLElement,
               sceneUrl = "/examples/full_workflow_demo.json") {
@@ -139,6 +147,7 @@ export class App {
     this.controls = null;
     this.camera = null;
     this.scene = null;
+    this.sceneRuntime = null;
     this.startedAtMs = performance.now();
     this.liveSolveScheduler = new LiveSolveScheduler(requestLiveSolve, 250);
     this.observabilitySession = createViewerSession({
@@ -165,8 +174,11 @@ export class App {
     this.latestBackendMissionPositions = null;
     this.missionPositionSource = "local_fallback";
     this.missionPositionRequestInFlight = false;
+    this.pendingMissionPositionRequestAtS = null;
     this.lastMissionPositionRequestAtS = null;
     this.latestLiveSolveRequest = null;
+    this.lastObservabilityFlushAtMs = performance.now();
+    this.lastRenderedConnectionKey = null;
   }
 
   getCameraForTest(): ReturnType<typeof createCamera> | null {
@@ -211,7 +223,10 @@ export class App {
     this.latestBackendMissionPositions = null;
     this.missionPositionSource = "local_fallback";
     this.missionPositionRequestInFlight = false;
+    this.pendingMissionPositionRequestAtS = null;
     this.lastMissionPositionRequestAtS = null;
+    this.lastObservabilityFlushAtMs = performance.now();
+    this.lastRenderedConnectionKey = null;
     const initialLiveFrame = buildLiveEstimationFrame(
       sceneTrace,
       0,
@@ -229,6 +244,8 @@ export class App {
         healthCheck: () => this.requestLiveSolverHealthWithObservability()
       }
     );
+    this.sceneRuntime = new SwarmSceneRuntime();
+    this.scene = this.sceneRuntime.scene;
     this.recordViewerEvent("viewer_session_started", "viewer-session-started", {
       scenario: sceneTrace.metadata.scenario,
       agent_count: sceneTrace.truth.nodes.length
@@ -272,15 +289,7 @@ export class App {
         this.refreshScene();
       }
     }));
-    this.linkCountControl = createLinkCountControl({
-      max: maxUwbLinksPerAgentLimit(this.viewerState.sceneTrace),
-      value: this.viewerState.maxUwbLinksPerAgent,
-      diagnostics: this.linkCountDiagnostics(),
-      onChange: (count) => {
-        this.viewerState!.setMaxUwbLinksPerAgent(count);
-        this.refreshScene();
-      }
-    });
+    this.linkCountControl = this.createLinkCountControlElement();
     panel.append(this.linkCountControl);
     panel.append(createCameraFollowControl({
       followsBarycenter: this.viewerState.cameraFollowsSwarmBarycenter,
@@ -363,13 +372,9 @@ export class App {
       catalog,
       onChange: (nextAction) => {
         const timeSeconds = (performance.now() - this.startedAtMs) / 1000;
-        const previousFormation = this.viewerState!.missionAction.formation;
         this.viewerState!.setMissionAction(nextAction, timeSeconds);
         this.lastMissionPositionRequestAtS = null;
         this.latestBackendMissionPositions = null;
-        if (nextAction.formation && nextAction.formation !== previousFormation) {
-          this.previousSelectedUwbLinks = [];
-        }
         this.recordViewerEvent(
           "viewer_mission_action_changed",
           "viewer-mission-action",
@@ -382,6 +387,7 @@ export class App {
         this.resetMissionPositionState();
         this.previousSelectedUwbLinks = [];
         this.latestUwbSelection = null;
+        this.renderLinkCountControl();
         this.renderMissionActionControls(catalog);
         this.recordViewerEvent(
           "viewer_mission_drone_count_changed",
@@ -393,6 +399,34 @@ export class App {
     });
     this.missionActionControlsHost.innerHTML = "";
     this.missionActionControlsHost.append(controls);
+  }
+
+  private createLinkCountControlElement(): HTMLElement {
+    const control = createLinkCountControl({
+      max: this.currentMaxUwbLinksPerAgent(),
+      value: this.viewerState!.maxUwbLinksPerAgent,
+      diagnostics: this.linkCountDiagnostics(),
+      onChange: (count) => {
+        this.viewerState!.setMaxUwbLinksPerAgent(count);
+        this.refreshScene();
+      }
+    });
+    return control;
+  }
+
+  private currentMaxUwbLinksPerAgent(): number {
+    const linkLimit = maxUwbLinksForDroneCount(this.viewerState!.missionDroneCount);
+    return linkLimit;
+  }
+
+  private renderLinkCountControl(): void {
+    if (!this.linkCountControl || !this.viewerState) {
+      return;
+    }
+
+    const nextControl = this.createLinkCountControlElement();
+    this.linkCountControl.replaceWith(nextControl);
+    this.linkCountControl = nextControl;
   }
 
   private async loadMissionActionCatalog(): Promise<void> {
@@ -413,26 +447,25 @@ export class App {
   }
 
   private refreshScene(): void {
-    if (!this.viewerState) {
+    if (!this.viewerState || !this.sceneRuntime) {
       return;
     }
 
     const timeSeconds = (performance.now() - this.startedAtMs) / 1000;
     const displayFrame = this.liveSolveScheduler.getDisplayFrame();
     const liveFrame = this.queueLiveSolve(timeSeconds);
-    const nextScene = createSwarmScene(
-      this.viewerState.sceneTrace,
-      this.viewerState.selectedIteration,
-      this.viewerState.layers,
+    this.sceneRuntime?.updateFrame({
+      sceneTrace: this.viewerState.sceneTrace,
+      selectedIteration: this.viewerState.selectedIteration,
+      layers: this.viewerState.layers,
       timeSeconds,
-      this.viewerState.maxUwbLinksPerAgent,
-      this.viewerState.motionAmplitudeM,
+      maxUwbLinksPerAgent: this.viewerState.maxUwbLinksPerAgent,
+      motionAmplitudeM: this.viewerState.motionAmplitudeM,
       displayFrame,
-      this.viewerState.missionAction,
+      missionAction: this.viewerState.missionAction,
       liveFrame
-    );
+    });
     this.updateCameraFollowTarget(liveFrame);
-    this.replaceScene(nextScene);
     this.renderInspector();
   }
 
@@ -443,7 +476,13 @@ export class App {
 
     const animate = (): void => {
       const frameStartMs = performance.now();
-      if (!this.viewerState || !this.renderer || !this.camera || !this.viewport) {
+      if (
+        !this.viewerState
+        || !this.renderer
+        || !this.camera
+        || !this.viewport
+        || !this.sceneRuntime
+      ) {
         return;
       }
 
@@ -451,22 +490,21 @@ export class App {
       const timeSeconds = (nowMs - this.startedAtMs) / 1000;
       const displayFrame = this.liveSolveScheduler.getDisplayFrame(nowMs);
       const liveFrame = this.queueLiveSolve(timeSeconds);
-      this.renderConnectionStatus();
-      const nextScene = createSwarmScene(
-        this.viewerState.sceneTrace,
-        this.viewerState.selectedIteration,
-        this.viewerState.layers,
+      this.renderConnectionStatusIfChanged();
+      this.sceneRuntime?.updateFrame({
+        sceneTrace: this.viewerState.sceneTrace,
+        selectedIteration: this.viewerState.selectedIteration,
+        layers: this.viewerState.layers,
         timeSeconds,
-        this.viewerState.maxUwbLinksPerAgent,
-        this.viewerState.motionAmplitudeM,
+        maxUwbLinksPerAgent: this.viewerState.maxUwbLinksPerAgent,
+        motionAmplitudeM: this.viewerState.motionAmplitudeM,
         displayFrame,
-        this.viewerState.missionAction,
+        missionAction: this.viewerState.missionAction,
         liveFrame
-      );
+      });
       this.updateCameraFollowTarget(liveFrame);
-      this.replaceScene(nextScene);
       this.controls?.update();
-      this.renderer.render(nextScene, this.camera);
+      this.renderer.render(this.sceneRuntime!.scene, this.camera);
       this.performanceMonitor.recordFrame(
         `viewer-frame-${Math.round(timeSeconds * 1000)}`,
         performance.now() - frameStartMs,
@@ -478,7 +516,7 @@ export class App {
       this.flushObservability();
       if (this.liveSolveScheduler.consumeFrameChanged()) {
         this.publishNewtonState(timeSeconds);
-        this.renderConnectionStatus();
+        this.renderConnectionStatusIfChanged();
         this.renderInspector();
       }
       this.animationFrame = requestAnimationFrame(animate);
@@ -487,22 +525,17 @@ export class App {
     this.animationFrame = requestAnimationFrame(animate);
   }
 
-  private replaceScene(nextScene: Scene): void {
-    if (this.scene && this.scene !== nextScene) {
-      disposeSceneGraph(this.scene);
-    }
-    this.scene = nextScene;
-  }
-
   destroy(): void {
     if (this.animationFrame !== null) {
       cancelAnimationFrame(this.animationFrame);
       this.animationFrame = null;
     }
 
+    this.flushObservability(true);
     this.controls?.dispose();
     this.controls = null;
-    disposeSceneGraph(this.scene);
+    this.sceneRuntime?.dispose();
+    this.sceneRuntime = null;
     this.scene = null;
     if (this.renderer) {
       this.renderer.forceContextLoss();
@@ -521,7 +554,10 @@ export class App {
     this.latestBackendMissionPositions = null;
     this.missionPositionSource = "local_fallback";
     this.missionPositionRequestInFlight = false;
+    this.pendingMissionPositionRequestAtS = null;
     this.lastMissionPositionRequestAtS = null;
+    this.lastObservabilityFlushAtMs = performance.now();
+    this.lastRenderedConnectionKey = null;
   }
 
   private linkCountDiagnostics(): {
@@ -592,16 +628,29 @@ export class App {
     if (!this.viewerState) {
       return;
     }
+    if (!this.newtonDiagnosticsActive()) {
+      return;
+    }
     const latestResponse = this.liveSolveScheduler.getLatestSolvedFrame();
     publishNewtonSharedState({
       schemaVersion: this.viewerState.sceneTrace.schema_version,
       timestampMs: Math.round(timeSeconds * 1000),
       missionAction: this.viewerState.missionAction,
       liveSolveRequest: request,
-      liveSolveResponse: latestResponse,
+      liveSolveResponse: null,
       selectedUwbLinks: request?.selected_uwb_links ?? [],
       solverBackend: latestResponse?.metadata.solver ?? null
     });
+  }
+
+  private newtonDiagnosticsActive(): boolean {
+    try {
+      const diagnosticsActive = window.localStorage.getItem(NEWTON_DIAGNOSTICS_STORAGE_KEY)
+        === "1";
+      return diagnosticsActive;
+    } catch {
+      return false;
+    }
   }
 
   private missionPositionsForLiveFrame(timeSeconds: number): Map<string, Position3D> {
@@ -625,14 +674,18 @@ export class App {
   }
 
   private requestBackendMissionPositions(timeSeconds: number): void {
-    if (!this.viewerState || this.missionPositionRequestInFlight) {
+    if (!this.viewerState) {
+      return;
+    }
+    if (this.missionPositionRequestInFlight) {
+      this.pendingMissionPositionRequestAtS = timeSeconds;
       return;
     }
 
+    const requestIntervalS = this.missionPositionRequestIntervalS();
     if (
       this.lastMissionPositionRequestAtS !== null
-      && timeSeconds - this.lastMissionPositionRequestAtS
-        < MISSION_ACTION_POSITION_REQUEST_INTERVAL_S
+      && timeSeconds - this.lastMissionPositionRequestAtS < requestIntervalS
     ) {
       return;
     }
@@ -648,7 +701,6 @@ export class App {
           return;
         }
         this.latestBackendMissionPositions = positions;
-        this.refreshScene();
       })
       .catch(() => {
         if (!this.latestBackendMissionPositions) {
@@ -657,6 +709,11 @@ export class App {
       })
       .finally(() => {
         this.missionPositionRequestInFlight = false;
+        const pendingRequestAtS = this.pendingMissionPositionRequestAtS;
+        this.pendingMissionPositionRequestAtS = null;
+        if (pendingRequestAtS !== null) {
+          this.requestBackendMissionPositions(pendingRequestAtS);
+        }
       });
   }
 
@@ -685,7 +742,25 @@ export class App {
     this.latestBackendMissionPositions = null;
     this.missionPositionSource = "local_fallback";
     this.missionPositionRequestInFlight = false;
+    this.pendingMissionPositionRequestAtS = null;
     this.lastMissionPositionRequestAtS = null;
+  }
+
+  private missionPositionRequestIntervalS(): number {
+    const action = this.viewerState?.missionAction;
+    if (!action) {
+      return FAST_MISSION_POSITION_REQUEST_INTERVAL_S;
+    }
+
+    if (
+      action.motion === "static"
+      || (action.motion === "forward" && action.speedMps <= 0)
+      || (action.motion === "random_walk" && action.randomWalkAmplitudeM <= 0)
+    ) {
+      return STATIC_MISSION_POSITION_REQUEST_INTERVAL_S;
+    }
+
+    return FAST_MISSION_POSITION_REQUEST_INTERVAL_S;
   }
 
   private updateCameraFollowTarget(liveFrame: LiveEstimationFrame | null): void {
@@ -825,7 +900,7 @@ export class App {
         durationMs
       );
       this.renderConnectionStatus();
-      this.flushObservability();
+      this.flushObservability(true);
       return response;
     } catch (error) {
       const durationMs = performance.now() - startedAtMs;
@@ -852,7 +927,7 @@ export class App {
         durationMs
       );
       this.renderConnectionStatus();
-      this.flushObservability();
+      this.flushObservability(true);
       throw error;
     }
   }
@@ -871,7 +946,7 @@ export class App {
         endpoint: defaultLiveSolverHealthEndpoint
       }, durationMs);
       this.renderConnectionStatus();
-      this.flushObservability();
+      this.flushObservability(true);
     } catch (error) {
       const durationMs = performance.now() - startedAtMs;
       this.connectionState = updateConnectionState(this.connectionState, {
@@ -884,7 +959,7 @@ export class App {
         error: error instanceof Error ? error.message : String(error)
       }, durationMs);
       this.renderConnectionStatus();
-      this.flushObservability();
+      this.flushObservability(true);
       throw error;
     }
   }
@@ -932,6 +1007,22 @@ export class App {
     detail.textContent = statusModel.detail;
     statusElement.dataset.tone = statusModel.tone;
     statusElement.append(label, detail);
+  }
+
+  private renderConnectionStatusIfChanged(): void {
+    if (!this.panel) {
+      return;
+    }
+    const connectionStatus = this.liveConnectionStatus();
+    const connectionKey = [
+      connectionStatus,
+      this.liveSolveScheduler.getError() ?? this.connectionState.lastError ?? ""
+    ].join("|");
+    if (connectionKey === this.lastRenderedConnectionKey) {
+      return;
+    }
+    this.lastRenderedConnectionKey = connectionKey;
+    this.renderConnectionStatus();
   }
 
   private recordViewerEvent(event: string,
@@ -984,7 +1075,12 @@ export class App {
     return fields;
   }
 
-  private flushObservability(): void {
+  private flushObservability(force = false): void {
+    const nowMs = performance.now();
+    if (!force && nowMs - this.lastObservabilityFlushAtMs < OBSERVABILITY_FLUSH_INTERVAL_MS) {
+      return;
+    }
+    this.lastObservabilityFlushAtMs = nowMs;
     void flushObservationEvents(this.eventBuffer, "/observability/events")
       .catch(() => undefined);
     const pendingSamples = this.performanceMonitor.samples()
@@ -1002,7 +1098,7 @@ export class App {
   private pickObject(event: MouseEvent,
                      renderer: WebGLRenderer,
                      camera: ReturnType<typeof createCamera>,
-                     scene: ReturnType<typeof createSwarmScene>): Object3D | null {
+                     scene: Scene): Object3D | null {
     const bounds = renderer.domElement.getBoundingClientRect();
     const pointer = new Vector2(
       ((event.clientX - bounds.left) / Math.max(bounds.width, 1)) * 2 - 1,

@@ -82,6 +82,24 @@ type MissionPositionTestAccess = {
   missionPositionsForLiveFrame: (timeSeconds: number) => Map<string, Position3D>;
 };
 
+class FakeBroadcastChannel {
+  static postedMessages: unknown[] = [];
+  name: string;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  postMessage(message: unknown): void {
+    FakeBroadcastChannel.postedMessages.push(message);
+  }
+
+  close(): void {
+    return undefined;
+  }
+}
+
 function cameraDistanceFromFollowTarget(camera: NonNullable<ReturnType<App["getCameraForTest"]>>): number {
   const distanceM = Math.hypot(
     camera.position.x - controlsTargetState.x,
@@ -188,6 +206,80 @@ describe("App camera lifecycle", () => {
 
     expect(app.getCameraForTest()).toBe(cameraBeforeControlChange);
     expect(disposeMock).not.toHaveBeenCalled();
+  });
+
+  it("updates the UWB link slider limit when the mission drone count changes", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    app.mount(sceneTrace);
+    const droneCount = root.querySelector<HTMLSelectElement>('[name="missionDroneCount"]')!;
+    droneCount.value = "50";
+    droneCount.dispatchEvent(new Event("change"));
+    const uwbSlider = root.querySelector<HTMLInputElement>(".link-count-control input")!;
+
+    expect(uwbSlider.max).toBe("20");
+  });
+
+  it("keeps the selected UWB graph stable when formation changes begin", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    app.mount(sceneTrace);
+    const droneCount = root.querySelector<HTMLSelectElement>('[name="missionDroneCount"]')!;
+    droneCount.value = "2";
+    droneCount.dispatchEvent(new Event("change"));
+    const uwbSlider = root.querySelector<HTMLInputElement>(".link-count-control input")!;
+    uwbSlider.value = "1";
+    uwbSlider.dispatchEvent(new Event("input"));
+    const existingSelectedLinks = [{
+      sourceId: "agent_0",
+      targetId: "agent_1",
+      measuredDistanceM: 2,
+      sigmaM: 0.1,
+      selectionReason: "retained" as const
+    }];
+    (app as unknown as { previousSelectedUwbLinks: typeof existingSelectedLinks })
+      .previousSelectedUwbLinks = existingSelectedLinks;
+    const formation = root.querySelector<HTMLSelectElement>('[name="formation"]')!;
+    formation.value = "line";
+    formation.dispatchEvent(new Event("change"));
+
+    expect(
+      (app as unknown as { previousSelectedUwbLinks: typeof existingSelectedLinks })
+        .previousSelectedUwbLinks
+    ).toEqual([expect.objectContaining({
+      sourceId: "agent_0",
+      targetId: "agent_1",
+      selectionReason: "retained"
+    })]);
+  });
+
+  it("renders one persistent scene across animation frames", () => {
+    const animationCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => {
+        animationCallbacks.push(callback);
+        return animationCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation(() => undefined);
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    try {
+      app.mount(sceneTrace);
+      animationCallbacks[0](16);
+      animationCallbacks[1](32);
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
+
+    expect(renderMock).toHaveBeenCalledTimes(2);
+    expect(renderMock.mock.calls[1][0]).toBe(renderMock.mock.calls[0][0]);
   });
 
   it("mounts mission action controls and records action context on solve events", async () => {
@@ -468,6 +560,8 @@ describe("App camera lifecycle", () => {
         );
       });
       await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
 
       const firstRequestTimeSeconds = Number(positionRequests[0].time_s);
       const nextRequestTimeSeconds = firstRequestTimeSeconds + 0.04;
@@ -485,6 +579,122 @@ describe("App camera lifecycle", () => {
     } finally {
       requestAnimationFrameSpy.mockRestore();
       cancelAnimationFrameSpy.mockRestore();
+    }
+  });
+
+  it("reduces backend mission-position cadence for static motion", async () => {
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation(() => 1);
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation(() => undefined);
+    const positionRequests: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: unknown, init?: { body?: unknown }) => {
+      const url = String(input);
+      if (url.includes("/mission-actions/catalog")) {
+        return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
+      }
+      if (url.includes("/mission-actions/positions") && init?.body) {
+        positionRequests.push(JSON.parse(String(init.body)));
+        return {
+          ok: true,
+          status: 200,
+          text: async () => "",
+          json: async () => ({
+            schema_version: "0.1.0",
+            metadata: { formation: "grid", motion: "static", time_s: 0 },
+            positions: [{ agent_id: "agent_0", position_m: [0, 0, 0] }]
+          })
+        };
+      }
+      if (url.includes("/observability/")) {
+        return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
+      }
+      throw new Error("NetworkError when attempting to fetch resource.");
+    }));
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+    const missionAccess = app as unknown as MissionPositionTestAccess;
+
+    try {
+      app.mount(sceneTrace);
+      const motion = root.querySelector<HTMLSelectElement>('[name="motion"]')!;
+      motion.value = "static";
+      motion.dispatchEvent(new Event("change"));
+      await vi.waitFor(() => {
+        expect(positionRequests).toHaveLength(1);
+      });
+      await vi.waitFor(() => {
+        expect(missionAccess.missionPositionsForLiveFrame(0).get("agent_0")).toEqual(
+          [0, 0, 0]
+        );
+      });
+      await Promise.resolve();
+
+      missionAccess.requestBackendMissionPositions(100.0);
+      await vi.waitFor(() => {
+        expect(positionRequests).toHaveLength(2);
+      });
+
+      missionAccess.requestBackendMissionPositions(100.5);
+      await Promise.resolve();
+      expect(positionRequests).toHaveLength(2);
+
+      missionAccess.requestBackendMissionPositions(101.1);
+      await vi.waitFor(() => {
+        expect(positionRequests).toHaveLength(3);
+      });
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("applies backend mission-position responses without forcing an extra render", async () => {
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation(() => 1);
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", vi.fn(async (input: unknown) => {
+      const url = String(input);
+      if (url.includes("/mission-actions/catalog")) {
+        return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
+      }
+      if (url.includes("/mission-actions/positions")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => "",
+          json: async () => ({
+            schema_version: "0.1.0",
+            metadata: { formation: "grid", motion: "forward", time_s: 0 },
+            positions: [{ agent_id: "agent_0", position_m: [5, 0, 0] }]
+          })
+        };
+      }
+      if (url.includes("/observability/")) {
+        return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
+      }
+      throw new Error("NetworkError when attempting to fetch resource.");
+    }));
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    try {
+      app.mount(sceneTrace);
+      renderMock.mockClear();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(renderMock).not.toHaveBeenCalled();
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+      vi.unstubAllGlobals();
     }
   });
 
@@ -627,14 +837,14 @@ describe("App camera lifecycle", () => {
     expect(diagnostics!.textContent).toContain("1/3 selected");
   });
 
-  it("caps the link-count slider at the number of unique peers in the scene", () => {
+  it("caps the link-count slider at the active mission drone count", () => {
     const root = document.createElement("div");
     const app = createTestApp(root);
 
     app.mount(sceneTrace);
     const uwbSlider = root.querySelector<HTMLInputElement>(".link-count-control input");
 
-    expect(uwbSlider!.max).toBe("1");
+    expect(uwbSlider!.max).toBe("0");
   });
 
   it("moves the orbit target and zooms to fit the swarm by default", () => {
@@ -796,6 +1006,71 @@ describe("App camera lifecycle", () => {
     expect(forceContextLossMock).toHaveBeenCalledTimes(1);
     expect(disposeMock).toHaveBeenCalledTimes(1);
   });
+
+  it("paces frame-loop observability flushes", () => {
+    const animationCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => {
+        animationCallbacks.push(callback);
+        return animationCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation(() => undefined);
+    const performanceFlushes: unknown[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: unknown, init?: { body?: unknown }) => {
+      const url = String(input);
+      if (url.includes("/observability/performance") && init?.body) {
+        performanceFlushes.push(JSON.parse(String(init.body)));
+      }
+      return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
+    }));
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    try {
+      app.mount(sceneTrace);
+      animationCallbacks[0](16);
+      animationCallbacks[1](32);
+      animationCallbacks[2](48);
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+
+    expect(performanceFlushes).toHaveLength(0);
+  });
+
+  it("does not publish Newton shared state during normal viewer operation", () => {
+    const animationCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => {
+        animationCallbacks.push(callback);
+        return animationCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation(() => undefined);
+    FakeBroadcastChannel.postedMessages = [];
+    vi.stubGlobal("BroadcastChannel", FakeBroadcastChannel);
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    try {
+      app.mount(sceneTrace);
+      animationCallbacks[0](16);
+      animationCallbacks[1](300);
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+      vi.unstubAllGlobals();
+    }
+
+    expect(FakeBroadcastChannel.postedMessages).toEqual([]);
+  });
 });
 
 describe("App viewport connection badge", () => {
@@ -905,7 +1180,7 @@ describe("App live solve failure observability", () => {
       expect(failedEvent!.fields.selection_policy).toBe("adaptive_range_graph_v1");
       expect(failedEvent!.fields.candidate_uwb_links).toBe(0);
       expect(failedEvent!.fields.selected_uwb_links).toBe(0);
-      expect(failedEvent!.fields.max_uwb_links_per_agent).toBe(1);
+      expect(failedEvent!.fields.max_uwb_links_per_agent).toBe(0);
       expect(failedEvent!.fields).not.toHaveProperty("cost_uwb");
     });
   });

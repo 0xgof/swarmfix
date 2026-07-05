@@ -4,6 +4,7 @@ import type { SceneTrace } from "../data/sceneTypes";
 import {
   createMissionAgentIds,
   createViewerState,
+  maxUwbLinksForDroneCount,
   maxUwbLinksPerAgentLimit
 } from "./ViewerState";
 import { PlaybackController } from "./PlaybackController";
@@ -53,14 +54,15 @@ describe("viewer state and playback", () => {
     expect(viewerState.selectedIteration).toBe(0);
   });
 
-  it("clamps the per-drone link cap to the number of unique peers in the scene", () => {
+  it("clamps the per-drone link cap to the active mission drone count", () => {
     const viewerState = createViewerState(sceneWithIterations(1));
 
-    expect(viewerState.maxUwbLinksPerAgent).toBe(1);
+    expect(viewerState.maxUwbLinksPerAgent).toBe(0);
     viewerState.setMaxUwbLinksPerAgent(12);
-    expect(viewerState.maxUwbLinksPerAgent).toBe(1);
+    expect(viewerState.maxUwbLinksPerAgent).toBe(0);
+    viewerState.setMissionDroneCount(50);
     viewerState.setMaxUwbLinksPerAgent(99);
-    expect(viewerState.maxUwbLinksPerAgent).toBe(1);
+    expect(viewerState.maxUwbLinksPerAgent).toBe(20);
     viewerState.setMaxUwbLinksPerAgent(-5);
     expect(viewerState.maxUwbLinksPerAgent).toBe(0);
   });
@@ -85,6 +87,19 @@ describe("viewer state and playback", () => {
     expect(maxUwbLinksPerAgentLimit(tenAgentScene)).toBe(9);
     viewerState.setMaxUwbLinksPerAgent(12);
     expect(viewerState.maxUwbLinksPerAgent).toBe(9);
+  });
+
+  it("expands and shrinks the per-drone link cap with the mission drone count", () => {
+    const viewerState = createViewerState(sceneWithIterations(1));
+
+    viewerState.setMissionDroneCount(50);
+    viewerState.setMaxUwbLinksPerAgent(50);
+    expect(maxUwbLinksForDroneCount(viewerState.missionDroneCount)).toBe(20);
+    expect(viewerState.maxUwbLinksPerAgent).toBe(20);
+
+    viewerState.setMissionDroneCount(4);
+    expect(maxUwbLinksForDroneCount(viewerState.missionDroneCount)).toBe(3);
+    expect(viewerState.maxUwbLinksPerAgent).toBe(3);
   });
 
   it("stores mission action state updates", () => {

@@ -6,6 +6,7 @@ import type {
 import type { MissionActionState } from "../simulation/missionActions";
 
 export const NEWTON_SHARED_STATE_CHANNEL = "swarmfix-newton-shared-state";
+export const NEWTON_DIAGNOSTICS_STORAGE_KEY = "swarmfix:newton-diagnostics";
 
 export interface NewtonSharedState {
   schemaVersion: string;
