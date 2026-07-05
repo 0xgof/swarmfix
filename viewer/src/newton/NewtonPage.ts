@@ -12,6 +12,7 @@ import {
   type FormationSelection
 } from "./formationSelection";
 import {
+  NEWTON_DIAGNOSTICS_STORAGE_KEY,
   subscribeNewtonSharedState,
   type NewtonSharedState,
   type NewtonSharedStateUnsubscribe
@@ -48,6 +49,8 @@ const request: LiveSolveRequest = {
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+const MAX_MATRIX_ROWS = 24;
+const MAX_MATRIX_COLUMNS = 24;
 
 function formatNumber(value: number): string {
   if (Math.abs(value) < 0.0005) {
@@ -84,22 +87,30 @@ function createEquation(): HTMLElement {
 
 function createMatrix(titleText: string,
                       matrix: number[][],
-                      snapshot: NormalSystemSnapshot): HTMLElement {
+                      snapshot: NormalSystemSnapshot,
+                      highlightedVariables: Set<number> = new Set(),
+                      cellClassName = ""): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "newton-matrix-panel";
   const title = document.createElement("h2");
   title.textContent = titleText;
   const grid = document.createElement("div");
   grid.className = "newton-matrix-grid";
-  grid.style.setProperty("--newton-columns", String(matrix[0]?.length ?? 1));
+  const visibleRows = Math.min(matrix.length, MAX_MATRIX_ROWS);
+  const visibleColumns = Math.min(matrix[0]?.length ?? 1, MAX_MATRIX_COLUMNS);
+  grid.style.setProperty("--newton-columns", String(visibleColumns));
 
-  for (let row = 0; row < matrix.length; row += 1) {
-    for (let column = 0; column < matrix[row].length; column += 1) {
+  for (let row = 0; row < visibleRows; row += 1) {
+    for (let column = 0; column < visibleColumns; column += 1) {
       const cell = document.createElement("span");
       const value = matrix[row][column];
-      cell.className = value === 0
-        ? "newton-matrix-cell zero"
-        : "newton-matrix-cell nonzero";
+      const highlighted = highlightedVariables.has(row) || highlightedVariables.has(column);
+      cell.className = [
+        "newton-matrix-cell",
+        cellClassName,
+        value === 0 ? "zero" : "nonzero",
+        highlighted ? "highlighted" : ""
+      ].filter(Boolean).join(" ");
       cell.textContent = formatNumber(value);
       cell.title = `${snapshot.variableColumns[row]?.agentId ?? row} x `
         + `${snapshot.variableColumns[column]?.agentId ?? column}: ${formatNumber(value)}`;
@@ -108,15 +119,28 @@ function createMatrix(titleText: string,
   }
 
   panel.append(title, grid);
+  if (visibleRows < matrix.length || visibleColumns < (matrix[0]?.length ?? 0)) {
+    const limitNote = document.createElement("p");
+    limitNote.className = "newton-window-note";
+    limitNote.textContent = (
+      `showing first ${visibleRows} rows and ${visibleColumns} columns`
+      + ` of ${matrix.length} x ${matrix[0]?.length ?? 0}`
+    );
+    panel.append(limitNote);
+  }
   return panel;
 }
 
 function shouldHighlightCell(row: number,
                              column: number,
                              highlightedRows: Set<number>,
-                             highlightedColumns: Set<number>): boolean {
+                             highlightedColumns: Set<number>,
+                             highlightedRowsVisible = true): boolean {
   if (highlightedRows.size > 0 && highlightedColumns.size > 0) {
-    return highlightedRows.has(row) && highlightedColumns.has(column);
+    if (highlightedRowsVisible) {
+      return highlightedRows.has(row) && highlightedColumns.has(column);
+    }
+    return highlightedColumns.has(column);
   }
   if (highlightedRows.size > 0) {
     return highlightedRows.has(row);
@@ -133,17 +157,26 @@ function createJacobianMatrix(snapshot: NormalSystemSnapshot,
   title.textContent = "J";
   const grid = document.createElement("div");
   grid.className = "newton-matrix-grid newton-j-grid";
-  grid.style.setProperty("--newton-columns", String(snapshot.jacobian[0]?.length ?? 1));
+  const visibleRows = Math.min(snapshot.jacobian.length, MAX_MATRIX_ROWS);
+  const visibleColumns = Math.min(
+    snapshot.jacobian[0]?.length ?? 1,
+    MAX_MATRIX_COLUMNS
+  );
+  const highlightedRowsVisible = [...highlight.rows].some((row) => (
+    row >= 0 && row < visibleRows
+  ));
+  grid.style.setProperty("--newton-columns", String(visibleColumns));
 
-  for (let row = 0; row < snapshot.jacobian.length; row += 1) {
-    for (let column = 0; column < snapshot.jacobian[row].length; column += 1) {
+  for (let row = 0; row < visibleRows; row += 1) {
+    for (let column = 0; column < visibleColumns; column += 1) {
       const cell = document.createElement("span");
       const value = snapshot.jacobian[row][column];
       const highlighted = shouldHighlightCell(
         row,
         column,
         highlight.rows,
-        highlight.columns
+        highlight.columns,
+        highlightedRowsVisible
       );
       cell.className = [
         "newton-matrix-cell",
@@ -160,10 +193,25 @@ function createJacobianMatrix(snapshot: NormalSystemSnapshot,
   }
 
   panel.append(title, grid);
+  if (
+    visibleRows < snapshot.jacobian.length
+    || visibleColumns < (snapshot.jacobian[0]?.length ?? 0)
+  ) {
+    const limitNote = document.createElement("p");
+    limitNote.className = "newton-window-note";
+    limitNote.textContent = (
+      `showing first ${visibleRows} rows and ${visibleColumns} columns`
+      + ` of ${snapshot.jacobian.length} x ${snapshot.jacobian[0]?.length ?? 0}`
+    );
+    panel.append(limitNote);
+  }
   return panel;
 }
 
-function createVector(titleText: string, values: number[]): HTMLElement {
+function createVector(titleText: string,
+                      values: number[],
+                      highlightedVariables: Set<number> = new Set(),
+                      entryClassName = ""): HTMLElement {
   const panel = document.createElement("section");
   panel.className = "newton-vector-panel";
   const title = document.createElement("h2");
@@ -171,7 +219,12 @@ function createVector(titleText: string, values: number[]): HTMLElement {
   const list = document.createElement("ol");
   list.className = "newton-vector-list";
   for (const value of values) {
+    const index = list.children.length;
     const item = document.createElement("li");
+    item.className = [
+      entryClassName,
+      highlightedVariables.has(index) ? "highlighted" : ""
+    ].filter(Boolean).join(" ");
     item.textContent = formatNumber(value);
     list.append(item);
   }
@@ -194,6 +247,7 @@ export class NewtonPage {
   private unsubscribe: NewtonSharedStateUnsubscribe | null;
   private latestSharedState: NewtonSharedState | null;
   private activeSelection: FormationSelection | null;
+  private previousDiagnosticsFlag: string | null;
 
   constructor(root: HTMLElement, options: NewtonPageOptions = {}) {
     this.root = root;
@@ -201,10 +255,12 @@ export class NewtonPage {
     this.unsubscribe = null;
     this.latestSharedState = null;
     this.activeSelection = null;
+    this.previousDiagnosticsFlag = null;
   }
 
   mount(): void {
     this.unsubscribe?.();
+    this.enableViewerDiagnostics();
     this.unsubscribe = this.subscribe((state) => {
       this.latestSharedState = state;
       this.render();
@@ -215,6 +271,41 @@ export class NewtonPage {
   destroy(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.restoreViewerDiagnostics();
+  }
+
+  private enableViewerDiagnostics(): void {
+    try {
+      this.previousDiagnosticsFlag = window.localStorage.getItem(
+        NEWTON_DIAGNOSTICS_STORAGE_KEY
+      );
+      window.localStorage.setItem(NEWTON_DIAGNOSTICS_STORAGE_KEY, "1");
+    } catch {
+      return;
+    }
+  }
+
+  private restoreViewerDiagnostics(): void {
+    try {
+      if (this.previousDiagnosticsFlag === null) {
+        window.localStorage.removeItem(NEWTON_DIAGNOSTICS_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(
+          NEWTON_DIAGNOSTICS_STORAGE_KEY,
+          this.previousDiagnosticsFlag
+        );
+      }
+    } catch {
+      return;
+    }
+  }
+
+  private selectFormationElement(selection: FormationSelection,
+                                 event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.activeSelection = selection;
+    this.render();
   }
 
   private render(): void {
@@ -259,15 +350,16 @@ export class NewtonPage {
     const content = document.createElement("div");
     content.className = "newton-content";
     const swarmPane = this.createFormationPane(request);
+    const highlight = highlightForSelection(snapshot, this.activeSelection);
 
     const systemPane = document.createElement("div");
     systemPane.className = "newton-system-pane";
     systemPane.append(
       createEquation(),
       createJacobianMatrix(snapshot, this.activeSelection),
-      createMatrix("J^T J", snapshot.normalMatrix, snapshot),
-      createVector("-J^T r", snapshot.rhs),
-      createVector("delta_x", snapshot.delta)
+      createMatrix("J^T J", snapshot.normalMatrix, snapshot, highlight.columns, "newton-normal-cell"),
+      createVector("-J^T r", snapshot.rhs, highlight.columns, "newton-rhs-entry"),
+      createVector("delta_x", snapshot.delta, highlight.columns, "newton-delta-entry")
     );
     content.append(swarmPane, systemPane);
     return content;
@@ -326,6 +418,29 @@ export class NewtonPage {
       if (!source || !target) {
         continue;
       }
+      const hitLine = document.createElementNS(SVG_NS, "line");
+      hitLine.setAttribute("class", "newton-formation-hit-target newton-formation-link-hit");
+      hitLine.setAttribute("x1", String(source[0]));
+      hitLine.setAttribute("y1", String(source[1]));
+      hitLine.setAttribute("x2", String(target[0]));
+      hitLine.setAttribute("y2", String(target[1]));
+      hitLine.dataset.newtonSelection = `uwb:${link.key}`;
+      hitLine.addEventListener("click", (event) => {
+        this.selectFormationElement({
+          kind: "uwb",
+          sourceId: link.sourceId,
+          targetId: link.targetId
+        }, event);
+      });
+      hitLine.addEventListener("pointerdown", (event) => {
+        this.selectFormationElement({
+          kind: "uwb",
+          sourceId: link.sourceId,
+          targetId: link.targetId
+        }, event);
+      });
+      svg.append(hitLine);
+
       const line = document.createElementNS(SVG_NS, "line");
       const selected = selectionMatchesLink(this.activeSelection, link.sourceId, link.targetId);
       line.setAttribute("class", selected
@@ -336,19 +451,39 @@ export class NewtonPage {
       line.setAttribute("x2", String(target[0]));
       line.setAttribute("y2", String(target[1]));
       line.dataset.newtonSelection = `uwb:${link.key}`;
-      line.addEventListener("click", () => {
-        this.activeSelection = {
+      line.addEventListener("click", (event) => {
+        this.selectFormationElement({
           kind: "uwb",
           sourceId: link.sourceId,
           targetId: link.targetId
-        };
-        this.render();
+        }, event);
+      });
+      line.addEventListener("pointerdown", (event) => {
+        this.selectFormationElement({
+          kind: "uwb",
+          sourceId: link.sourceId,
+          targetId: link.targetId
+        }, event);
       });
       svg.append(line);
     }
 
     for (const marker of elements.gnssMarkers) {
       const [x, y] = project(marker.position);
+      const hitCircle = document.createElementNS(SVG_NS, "circle");
+      hitCircle.setAttribute("class", "newton-formation-hit-target");
+      hitCircle.setAttribute("cx", String(x));
+      hitCircle.setAttribute("cy", String(y));
+      hitCircle.setAttribute("r", "18");
+      hitCircle.dataset.newtonSelection = `gnss:${marker.agentId}`;
+      hitCircle.addEventListener("click", (event) => {
+        this.selectFormationElement({ kind: "gnss", agentId: marker.agentId }, event);
+      });
+      hitCircle.addEventListener("pointerdown", (event) => {
+        this.selectFormationElement({ kind: "gnss", agentId: marker.agentId }, event);
+      });
+      svg.append(hitCircle);
+
       const circle = document.createElementNS(SVG_NS, "circle");
       circle.setAttribute("class", this.activeSelection?.kind === "gnss"
         && this.activeSelection.agentId === marker.agentId
@@ -358,9 +493,11 @@ export class NewtonPage {
       circle.setAttribute("cy", String(y));
       circle.setAttribute("r", "7");
       circle.dataset.newtonSelection = `gnss:${marker.agentId}`;
-      circle.addEventListener("click", () => {
-        this.activeSelection = { kind: "gnss", agentId: marker.agentId };
-        this.render();
+      circle.addEventListener("click", (event) => {
+        this.selectFormationElement({ kind: "gnss", agentId: marker.agentId }, event);
+      });
+      circle.addEventListener("pointerdown", (event) => {
+        this.selectFormationElement({ kind: "gnss", agentId: marker.agentId }, event);
       });
       svg.append(circle);
     }
@@ -373,9 +510,23 @@ export class NewtonPage {
         ? "newton-formation-drone selected"
         : "newton-formation-drone");
       group.dataset.newtonSelection = `drone:${drone.agentId}`;
-      group.addEventListener("click", () => {
-        this.activeSelection = { kind: "drone", agentId: drone.agentId };
-        this.render();
+      group.addEventListener("click", (event) => {
+        this.selectFormationElement({ kind: "drone", agentId: drone.agentId }, event);
+      });
+      group.addEventListener("pointerdown", (event) => {
+        this.selectFormationElement({ kind: "drone", agentId: drone.agentId }, event);
+      });
+      const hitCircle = document.createElementNS(SVG_NS, "circle");
+      hitCircle.setAttribute("class", "newton-formation-hit-target");
+      hitCircle.setAttribute("cx", String(x));
+      hitCircle.setAttribute("cy", String(y));
+      hitCircle.setAttribute("r", "20");
+      hitCircle.dataset.newtonSelection = `drone:${drone.agentId}`;
+      hitCircle.addEventListener("click", (event) => {
+        this.selectFormationElement({ kind: "drone", agentId: drone.agentId }, event);
+      });
+      hitCircle.addEventListener("pointerdown", (event) => {
+        this.selectFormationElement({ kind: "drone", agentId: drone.agentId }, event);
       });
       const circle = document.createElementNS(SVG_NS, "circle");
       circle.setAttribute("cx", String(x));
@@ -385,7 +536,7 @@ export class NewtonPage {
       label.setAttribute("x", String(x + 13));
       label.setAttribute("y", String(y + 4));
       label.textContent = drone.agentId;
-      group.append(circle, label);
+      group.append(hitCircle, circle, label);
       svg.append(group);
     }
 

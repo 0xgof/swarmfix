@@ -100,6 +100,20 @@
   stroke-width: 6;
 }
 
+.newton-formation-hit-target {
+  fill: transparent;
+  stroke: transparent;
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.newton-formation-link-hit {
+  fill: none;
+  stroke-width: 22;
+  stroke-linecap: round;
+  pointer-events: stroke;
+}
+
 .newton-formation-gnss {
   fill: #ffffff;
   stroke: #c9362c;
@@ -214,6 +228,13 @@
   background: #fbfcff;
   font-family: "Cascadia Mono", Consolas, monospace;
   font-size: 11px;
+}
+
+.newton-vector-list li.highlighted {
+  color: #102033;
+  background: #ffe28a;
+  border-color: #bd8b00;
+  box-shadow: inset 0 0 0 1px #bd8b00;
 }
 
 @media (max-width: 860px) {
