@@ -1,0 +1,232 @@
+.newton-page {
+  min-height: 100vh;
+  background: #f7f8fb;
+  color: #172033;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.newton-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 24px;
+  border-bottom: 1px solid #d9dfeb;
+  background: #ffffff;
+}
+
+.newton-title h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0;
+}
+
+.newton-title p {
+  margin: 4px 0 0;
+  color: #647087;
+  font-size: 13px;
+}
+
+.newton-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(86px, 1fr));
+  gap: 8px;
+}
+
+.newton-metric {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid #d9dfeb;
+  background: #fbfcff;
+}
+
+.newton-metric span {
+  color: #647087;
+  font-size: 11px;
+}
+
+.newton-metric strong {
+  font-size: 13px;
+}
+
+.newton-content {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(460px, 1.1fr);
+  gap: 18px;
+  padding: 18px;
+}
+
+.newton-swarm-pane,
+.newton-equation-panel,
+.newton-matrix-panel,
+.newton-vector-panel {
+  border: 1px solid #d9dfeb;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.newton-swarm-pane {
+  min-height: 460px;
+}
+
+.newton-formation-body {
+  min-height: 360px;
+  display: grid;
+  align-items: stretch;
+}
+
+.newton-formation-view {
+  width: 100%;
+  height: min(430px, 58vh);
+  min-height: 320px;
+  border: 1px solid #e2e7f0;
+  background: #fbfcff;
+}
+
+.newton-formation-link {
+  stroke: #2f6fb7;
+  stroke-width: 4;
+  stroke-linecap: round;
+  cursor: pointer;
+}
+
+.newton-formation-link:hover {
+  stroke: #174c8c;
+}
+
+.newton-formation-link.selected {
+  stroke: #bd8b00;
+  stroke-width: 6;
+}
+
+.newton-formation-gnss {
+  fill: #ffffff;
+  stroke: #c9362c;
+  stroke-width: 3;
+  cursor: pointer;
+}
+
+.newton-formation-gnss.selected {
+  fill: #ffe28a;
+  stroke: #bd8b00;
+}
+
+.newton-formation-drone {
+  cursor: pointer;
+}
+
+.newton-formation-drone circle {
+  fill: #172033;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.newton-formation-drone.selected circle {
+  fill: #bd8b00;
+}
+
+.newton-formation-drone text {
+  fill: #172033;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+  pointer-events: none;
+}
+
+.newton-selection-detail {
+  margin: 12px 0 0;
+  min-height: 22px;
+  color: #33415c;
+  font-size: 13px;
+}
+
+.newton-system-pane {
+  display: grid;
+  gap: 12px;
+}
+
+.newton-page h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.newton-equation {
+  margin: 0;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 18px;
+}
+
+.newton-equation-muted {
+  margin-top: 6px;
+  color: #647087;
+  font-size: 14px;
+}
+
+.newton-matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--newton-columns), minmax(42px, 1fr));
+  gap: 3px;
+}
+
+.newton-matrix-cell {
+  min-height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #e2e7f0;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+}
+
+.newton-matrix-cell.zero {
+  color: #9aa5b8;
+  background: #f7f8fb;
+}
+
+.newton-matrix-cell.nonzero {
+  color: #102033;
+  background: #d9e8ff;
+  border-color: #9dbff5;
+}
+
+.newton-matrix-cell.highlighted {
+  color: #102033;
+  background: #ffe28a;
+  border-color: #bd8b00;
+  box-shadow: inset 0 0 0 1px #bd8b00;
+}
+
+.newton-vector-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.newton-vector-list li {
+  min-height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #e2e7f0;
+  background: #fbfcff;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+}
+
+@media (max-width: 860px) {
+  .newton-toolbar,
+  .newton-content {
+    grid-template-columns: 1fr;
+  }
+
+  .newton-toolbar {
+    display: grid;
+  }
+
+  .newton-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

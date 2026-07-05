@@ -11,8 +11,10 @@ import {
 
 export interface MissionActionControlsProps {
   value: MissionActionState;
+  droneCount?: number;
   catalog?: MissionActionCatalog;
   onChange: (nextValue: MissionActionState) => void;
+  onDroneCountChange?: (nextCount: number) => void;
 }
 
 function optionElement(value: string,
@@ -45,8 +47,17 @@ function row(labelText: string,
   return label;
 }
 
+const DRONE_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 30, 40, 50];
+
+function droneCountOptions(selectedCount: number): number[] {
+  const options = new Set([...DRONE_COUNT_OPTIONS, selectedCount]);
+  const sortedOptions = [...options].sort((first, second) => first - second);
+  return sortedOptions;
+}
+
 export function createMissionActionControls(props: MissionActionControlsProps): HTMLElement {
   let currentValue = normalizeMissionActionState(props.value);
+  let currentDroneCount = Math.max(1, Math.floor(props.droneCount ?? 1));
   const catalog = props.catalog ?? fallbackMissionActionCatalog;
   const container = document.createElement("div");
   container.className = "mission-action-controls";
@@ -71,11 +82,19 @@ export function createMissionActionControls(props: MissionActionControlsProps): 
     currentValue.randomWalkAmplitudeM,
     "0.05"
   );
+  const droneCountSelect = document.createElement("select");
+  droneCountSelect.name = "missionDroneCount";
+  for (const option of droneCountOptions(currentDroneCount)) {
+    droneCountSelect.append(optionElement(String(option), `${option}`));
+  }
+  droneCountSelect.value = String(currentDroneCount);
   const readout = document.createElement("p");
   readout.className = "mission-action-readout";
 
   const renderReadout = (): void => {
-    readout.textContent = `${currentValue.formation} / ${currentValue.motion}`;
+    readout.textContent = (
+      `${currentDroneCount} drones / ${currentValue.formation} / ${currentValue.motion}`
+    );
   };
 
   const emit = (update: Partial<MissionActionState>): void => {
@@ -98,9 +117,16 @@ export function createMissionActionControls(props: MissionActionControlsProps): 
   amplitudeInput.addEventListener("input", () => {
     emit({ randomWalkAmplitudeM: Number(amplitudeInput.value) || 0 });
   });
+  droneCountSelect.addEventListener("change", () => {
+    currentDroneCount = Math.max(1, Math.floor(Number(droneCountSelect.value) || 1));
+    droneCountSelect.value = String(currentDroneCount);
+    renderReadout();
+    props.onDroneCountChange?.(currentDroneCount);
+  });
 
   renderReadout();
   container.append(
+    row("drones", droneCountSelect),
     row("formation", formationSelect),
     row("motion", motionSelect),
     row("speed", speedInput),

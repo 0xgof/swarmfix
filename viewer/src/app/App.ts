@@ -6,7 +6,8 @@ import type { SceneTrace } from "../data/sceneTypes";
 import type { Position3D } from "../animation/liveMotion";
 import {
   buildInitialLiveSolveResponse,
-  buildLiveSolveRequest
+  buildLiveSolveRequest,
+  type LiveSolveRequest
 } from "../live/liveSolveTypes";
 import {
   requestMissionActionCatalog,
@@ -36,13 +37,19 @@ import { createSwarmScene } from "../scene/createScene";
 import { disposeSceneGraph } from "../scene/disposeScene";
 import { buildLiveEstimationFrame } from "../simulation/liveEstimation";
 import type { LiveEstimationFrame } from "../simulation/liveEstimation";
+import { publishNewtonSharedState } from "../newton/newtonSharedState";
 import { fallbackMissionActionPositions } from "../simulation/missionActionFallback";
 import {
   createViewerState,
+  createMissionAgentIds,
   maxUwbLinksPerAgentLimit,
   type LayerVisibility,
   type ViewerState
 } from "./ViewerState";
+import {
+  buildIterationControlModel,
+  buildLayerControlItems
+} from "./layerControlModel";
 import { buildEdgeInspectorModel } from "../ui/EdgeDetailsPanel";
 import { createLayerControls } from "../ui/LayerControls";
 import { buildNodeInspectorModel } from "../ui/NodeDetailsPanel";
@@ -63,19 +70,6 @@ import {
 } from "../ui/ViewportConnectionBadge";
 import { formatMeters, formatVector } from "../utils/formatting";
 
-const layerLabels: Record<keyof LayerVisibility, string> = {
-  truth: "truth",
-  gnss: "GNSS",
-  gnssUncertainty: "GNSS sigma",
-  gnssOnly: "GNSS only",
-  fused: "fused",
-  corrected: "corrected",
-  references: "reference",
-  uwbLinks: "UWB",
-  positionError: "position error",
-  residuals: "residuals",
-  cost: "cost"
-};
 const CAMERA_FOLLOW_PADDING = 1.35;
 const CAMERA_FOLLOW_MIN_DISTANCE_M = 8.0;
 const CAMERA_FOLLOW_ZOOM_BEZIER_STEP = 0.38;
@@ -125,11 +119,13 @@ export class App {
   private latestUwbSelection: LiveEstimationFrame["uwbSelection"] | null;
   private linkCountControl: HTMLElement | null = null;
   private cameraFollowDistanceM: number | null;
+  private cameraFollowZoomReleasedByManualInput: boolean;
   private missionActionControlsHost: HTMLElement | null;
   private latestBackendMissionPositions: Map<string, Position3D> | null;
   private missionPositionSource: MissionPositionSource;
   private missionPositionRequestInFlight: boolean;
   private lastMissionPositionRequestAtS: number | null;
+  private latestLiveSolveRequest: LiveSolveRequest | null;
 
   constructor(root: HTMLElement,
               sceneUrl = "/examples/full_workflow_demo.json") {
@@ -164,11 +160,13 @@ export class App {
     this.previousSelectedUwbLinks = [];
     this.latestUwbSelection = null;
     this.cameraFollowDistanceM = null;
+    this.cameraFollowZoomReleasedByManualInput = false;
     this.missionActionControlsHost = null;
     this.latestBackendMissionPositions = null;
     this.missionPositionSource = "local_fallback";
     this.missionPositionRequestInFlight = false;
     this.lastMissionPositionRequestAtS = null;
+    this.latestLiveSolveRequest = null;
   }
 
   getCameraForTest(): ReturnType<typeof createCamera> | null {
@@ -208,6 +206,7 @@ export class App {
     this.previousSelectedUwbLinks = [];
     this.latestUwbSelection = null;
     this.cameraFollowDistanceM = null;
+    this.cameraFollowZoomReleasedByManualInput = false;
     this.missionActionControlsHost = null;
     this.latestBackendMissionPositions = null;
     this.missionPositionSource = "local_fallback";
@@ -263,9 +262,11 @@ export class App {
       }
     }));
     panel.append(createIterationSlider({
-      min: 0,
-      max: Math.max(0, this.viewerState.sceneTrace.trace.iterations.length - 1),
-      value: this.viewerState.selectedIteration,
+      ...buildIterationControlModel(
+        this.viewerState.sceneTrace,
+        this.viewerState.selectedIteration,
+        true
+      ),
       onChange: (iteration) => {
         this.viewerState!.setIteration(iteration);
         this.refreshScene();
@@ -285,6 +286,8 @@ export class App {
       followsBarycenter: this.viewerState.cameraFollowsSwarmBarycenter,
       onChange: (followsBarycenter) => {
         this.viewerState!.setCameraFollowsSwarmBarycenter(followsBarycenter);
+        this.cameraFollowDistanceM = null;
+        this.cameraFollowZoomReleasedByManualInput = false;
         this.refreshScene();
       }
     }));
@@ -339,12 +342,13 @@ export class App {
   }
 
   private layerControlItems(): Array<{ key: string; label: string; visible: boolean }> {
-    const items = (Object.keys(layerLabels) as Array<keyof LayerVisibility>)
-      .map((key) => ({
-        key,
-        label: layerLabels[key],
-        visible: this.viewerState?.layers[key] ?? false
-      }));
+    if (!this.viewerState) {
+      return [];
+    }
+    const items = buildLayerControlItems(
+      this.viewerState.sceneTrace,
+      this.viewerState.layers
+    );
     return items;
   }
 
@@ -355,18 +359,33 @@ export class App {
 
     const controls = createMissionActionControls({
       value: this.viewerState.missionAction,
+      droneCount: this.viewerState.missionDroneCount,
       catalog,
       onChange: (nextAction) => {
         const timeSeconds = (performance.now() - this.startedAtMs) / 1000;
         const previousFormation = this.viewerState!.missionAction.formation;
         this.viewerState!.setMissionAction(nextAction, timeSeconds);
         this.lastMissionPositionRequestAtS = null;
+        this.latestBackendMissionPositions = null;
         if (nextAction.formation && nextAction.formation !== previousFormation) {
           this.previousSelectedUwbLinks = [];
         }
         this.recordViewerEvent(
           "viewer_mission_action_changed",
           "viewer-mission-action",
+          this.actionContextFields()
+        );
+        this.refreshScene();
+      },
+      onDroneCountChange: (nextCount) => {
+        this.viewerState!.setMissionDroneCount(nextCount);
+        this.resetMissionPositionState();
+        this.previousSelectedUwbLinks = [];
+        this.latestUwbSelection = null;
+        this.renderMissionActionControls(catalog);
+        this.recordViewerEvent(
+          "viewer_mission_drone_count_changed",
+          "viewer-mission-drone-count",
           this.actionContextFields()
         );
         this.refreshScene();
@@ -458,6 +477,7 @@ export class App {
       );
       this.flushObservability();
       if (this.liveSolveScheduler.consumeFrameChanged()) {
+        this.publishNewtonState(timeSeconds);
         this.renderConnectionStatus();
         this.renderInspector();
       }
@@ -496,6 +516,7 @@ export class App {
     this.connectionBadge = null;
     this.linkCountControl = null;
     this.cameraFollowDistanceM = null;
+    this.cameraFollowZoomReleasedByManualInput = false;
     this.missionActionControlsHost = null;
     this.latestBackendMissionPositions = null;
     this.missionPositionSource = "local_fallback";
@@ -559,9 +580,28 @@ export class App {
         request_id: `solve-${Math.round(performance.now())}`,
         scenario: this.viewerState!.sceneTrace.metadata.scenario
       };
+      this.latestLiveSolveRequest = request;
+      this.publishNewtonState(timeSeconds, request);
       return request;
     });
     return liveFrame;
+  }
+
+  private publishNewtonState(timeSeconds: number,
+                             request: LiveSolveRequest | null = this.latestLiveSolveRequest): void {
+    if (!this.viewerState) {
+      return;
+    }
+    const latestResponse = this.liveSolveScheduler.getLatestSolvedFrame();
+    publishNewtonSharedState({
+      schemaVersion: this.viewerState.sceneTrace.schema_version,
+      timestampMs: Math.round(timeSeconds * 1000),
+      missionAction: this.viewerState.missionAction,
+      liveSolveRequest: request,
+      liveSolveResponse: latestResponse,
+      selectedUwbLinks: request?.selected_uwb_links ?? [],
+      solverBackend: latestResponse?.metadata.solver ?? null
+    });
   }
 
   private missionPositionsForLiveFrame(timeSeconds: number): Map<string, Position3D> {
@@ -575,7 +615,7 @@ export class App {
     }
 
     this.missionPositionSource = "local_fallback";
-    const agentIds = this.viewerState.sceneTrace.truth.nodes.map((node) => node.id);
+    const agentIds = this.activeMissionAgentIds();
     const fallbackPositions = fallbackMissionActionPositions(
       agentIds,
       this.viewerState.missionAction,
@@ -597,7 +637,7 @@ export class App {
       return;
     }
 
-    const agentIds = this.viewerState.sceneTrace.truth.nodes.map((node) => node.id);
+    const agentIds = this.activeMissionAgentIds();
     const missionAction = this.viewerState.missionAction;
     const requestActionKey = this.missionActionCacheKey();
     this.missionPositionRequestInFlight = true;
@@ -625,13 +665,33 @@ export class App {
       return "";
     }
 
-    const key = JSON.stringify(this.viewerState.missionAction);
+    const key = JSON.stringify({
+      missionAction: this.viewerState.missionAction,
+      missionDroneCount: this.viewerState.missionDroneCount
+    });
     return key;
+  }
+
+  private activeMissionAgentIds(): string[] {
+    if (!this.viewerState) {
+      return [];
+    }
+
+    const agentIds = createMissionAgentIds(this.viewerState.missionDroneCount);
+    return agentIds;
+  }
+
+  private resetMissionPositionState(): void {
+    this.latestBackendMissionPositions = null;
+    this.missionPositionSource = "local_fallback";
+    this.missionPositionRequestInFlight = false;
+    this.lastMissionPositionRequestAtS = null;
   }
 
   private updateCameraFollowTarget(liveFrame: LiveEstimationFrame | null): void {
     if (!this.viewerState?.cameraFollowsSwarmBarycenter) {
       this.cameraFollowDistanceM = null;
+      this.cameraFollowZoomReleasedByManualInput = false;
       return;
     }
 
@@ -701,6 +761,19 @@ export class App {
   private nextCameraFollowDistance(fitDistanceM: number,
                                    currentDistanceM: number): number {
     const storedDistanceM = this.cameraFollowDistanceM;
+    if (
+      storedDistanceM !== null
+      && Math.abs(currentDistanceM - storedDistanceM) > CAMERA_FOLLOW_MANUAL_ZOOM_EPSILON_M
+    ) {
+      this.cameraFollowZoomReleasedByManualInput = true;
+      this.cameraFollowDistanceM = currentDistanceM;
+    }
+
+    if (this.cameraFollowZoomReleasedByManualInput) {
+      this.cameraFollowDistanceM = currentDistanceM;
+      return currentDistanceM;
+    }
+
     const currentFollowDistanceM = (
       storedDistanceM !== null
       && Math.abs(currentDistanceM - storedDistanceM) <= CAMERA_FOLLOW_MANUAL_ZOOM_EPSILON_M
@@ -886,6 +959,7 @@ export class App {
       speed_mps: action.speedMps,
       random_walk_amplitude_m: action.randomWalkAmplitudeM,
       mission_position_source: this.missionPositionSource,
+      mission_drone_count: this.viewerState?.missionDroneCount ?? 0,
       max_uwb_links_per_agent: this.viewerState?.maxUwbLinksPerAgent ?? 0
     };
     return fields;

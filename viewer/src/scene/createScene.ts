@@ -65,16 +65,13 @@ export function createSwarmScene(sceneTrace: SceneTrace,
   const liveGnssOnlyPositions = gnssOnlyPositionMap(liveSolveFrame);
   const latestIteration = latestTraceIteration(liveSolveFrame);
   if (layers.gnss || layers.gnssUncertainty) {
-    for (const measurement of sceneTrace.measurements.gnss) {
-      const gnssPosition = liveFrame.gnssPositions.get(measurement.agent_id);
-      if (!gnssPosition) {
-        continue;
-      }
+    for (const [agentId, gnssPosition] of liveFrame.gnssPositions.entries()) {
+      const sigmaM = liveFrame.gnssSigma.get(agentId) ?? 1.0;
 
       if (layers.gnssUncertainty) {
         group.add(createGnssGroundUncertainty(
           gnssPosition,
-          measurement.uncertainty.radius_m
+          sigmaM
         ));
       }
       if (layers.gnss) {
@@ -82,7 +79,7 @@ export function createSwarmScene(sceneTrace: SceneTrace,
           gnssPosition,
           layerStyles.gnssMeasurement.marker
         );
-        gnssObject.userData = { kind: "node", agentId: measurement.agent_id };
+        gnssObject.userData = { kind: "node", agentId };
         group.add(gnssObject);
       }
     }

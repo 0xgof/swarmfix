@@ -13,7 +13,14 @@ import { defaultMissionActionState } from "../simulation/missionActions";
 describe("props-based viewer controls", () => {
   it("IterationSlider emits the selected iteration without ViewerState", () => {
     const onChange = vi.fn();
-    const element = createIterationSlider({ min: 0, max: 10, value: 2, onChange });
+    const element = createIterationSlider({
+      min: 0,
+      max: 10,
+      value: 2,
+      label: "exported trace iteration",
+      reason: "Inspects exported trace state.",
+      onChange
+    });
     const input = element.querySelector("input") as HTMLInputElement;
 
     input.value = "7";
@@ -21,6 +28,8 @@ describe("props-based viewer controls", () => {
 
     expect(input.min).toBe("0");
     expect(input.max).toBe("10");
+    expect(element.textContent).toContain("exported trace iteration");
+    expect(element.textContent).toContain("Inspects exported trace state.");
     expect(onChange).toHaveBeenCalledWith(7);
   });
 
@@ -29,7 +38,13 @@ describe("props-based viewer controls", () => {
     const element = createLayerControls({
       layers: [
         { key: "truth", label: "truth", visible: true },
-        { key: "uwb", label: "UWB", visible: false }
+        {
+          key: "references",
+          label: "reference",
+          visible: false,
+          disabled: true,
+          reason: "No reference measurements."
+        }
       ],
       onChange
     });
@@ -39,7 +54,9 @@ describe("props-based viewer controls", () => {
     inputs[1].dispatchEvent(new Event("change"));
 
     expect(inputs).toHaveLength(2);
-    expect(onChange).toHaveBeenCalledWith("uwb", true);
+    expect(inputs[1].disabled).toBe(true);
+    expect(element.textContent).toContain("No reference measurements.");
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("LinkCountControl emits the selected link count without ViewerState", () => {
@@ -151,5 +168,24 @@ describe("props-based viewer controls", () => {
     expect(formationOptions.map((option) => option.textContent)).toEqual(["backend ring"]);
     expect(motionOptions.map((option) => option.value)).toEqual(["static"]);
     expect(motionOptions.map((option) => option.textContent)).toEqual(["backend static"]);
+  });
+
+  it("MissionActionControls emits bounded drone-count changes without changing action state", () => {
+    const onChange = vi.fn();
+    const onDroneCountChange = vi.fn();
+    const element = createMissionActionControls({
+      value: defaultMissionActionState(),
+      droneCount: 3,
+      onChange,
+      onDroneCountChange
+    });
+    const droneCount = element.querySelector<HTMLSelectElement>('[name="missionDroneCount"]')!;
+
+    droneCount.value = "8";
+    droneCount.dispatchEvent(new Event("change"));
+
+    expect(onDroneCountChange).toHaveBeenCalledWith(8);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(element.textContent).toContain("8 drones");
   });
 });

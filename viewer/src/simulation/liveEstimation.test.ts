@@ -203,6 +203,60 @@ describe("live estimation frame", () => {
     expect(frame.uwbLinks[0].measuredDistanceM).toBeCloseTo(4);
   });
 
+  it("uses supplied mission positions as the active live agent set", () => {
+    const backendPositions = new Map([
+      ["agent_0", [10, 0, 5] as [number, number, number]],
+      ["agent_1", [14, 0, 5] as [number, number, number]],
+      ["agent_2", [10, 0, 9] as [number, number, number]],
+      ["agent_3", [14, 0, 9] as [number, number, number]],
+      ["agent_4", [12, 0, 12] as [number, number, number]]
+    ]);
+
+    const frame = buildLiveEstimationFrame(
+      sceneTrace,
+      3,
+      4,
+      0.3,
+      defaultMissionActionState(),
+      {},
+      [],
+      backendPositions
+    );
+
+    expect([...frame.truthPositions.keys()]).toEqual([
+      "agent_0",
+      "agent_1",
+      "agent_2",
+      "agent_3",
+      "agent_4"
+    ]);
+    expect(frame.gnssPositions.get("agent_0")).toEqual([10.2, 0, 5.1]);
+    expect(frame.gnssPositions.get("agent_4")).not.toEqual([12, 0, 12]);
+    expect(frame.gnssSigma.get("agent_4")).toBe(1);
+    expect(frame.uwbSelection.candidateLinkCount).toBe(10);
+  });
+
+  it("keeps generated GNSS markers visibly separate from generated truth", () => {
+    const backendPositions = new Map([
+      ["agent_4", [12, 0, 12] as [number, number, number]]
+    ]);
+
+    const frame = buildLiveEstimationFrame(
+      sceneTrace,
+      3,
+      1,
+      0.3,
+      defaultMissionActionState(),
+      {},
+      [],
+      backendPositions
+    );
+
+    expect(frame.truthPositions.get("agent_4")).toEqual([12, 0, 12]);
+    expect(frame.gnssPositions.get("agent_4")).not.toEqual([12, 0, 12]);
+    expect(frame.gnssSigma.get("agent_4")).toBe(1);
+  });
+
   it("moves truth and derives GNSS from the moved truth plus original GNSS error", () => {
     const frameAtStart = buildLiveEstimationFrame(sceneTrace, 0, 3, 0.3);
     const laterFrame = buildLiveEstimationFrame(sceneTrace, 1.5, 3, 0.3);

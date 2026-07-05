@@ -23,6 +23,7 @@ export interface ViewerState {
   sceneTrace: SceneTrace;
   selectedIteration: number;
   playbackSpeed: number;
+  missionDroneCount: number;
   maxUwbLinksPerAgent: number;
   motionAmplitudeM: number;
   cameraFollowsSwarmBarycenter: boolean;
@@ -33,6 +34,7 @@ export interface ViewerState {
   setIteration: (iteration: number) => void;
   getSelectedTraceIteration: () => TraceIteration | null;
   setLayerVisible: (layer: keyof LayerVisibility, visible: boolean) => void;
+  setMissionDroneCount: (droneCount: number) => void;
   setMaxUwbLinksPerAgent: (linkCount: number) => void;
   setMotionAmplitude: (motionAmplitudeM: number) => void;
   setCameraFollowsSwarmBarycenter: (followsBarycenter: boolean) => void;
@@ -47,6 +49,28 @@ function maxIterationIndex(sceneTrace: SceneTrace): number {
 }
 
 export const UWB_LINKS_PER_AGENT_LIMIT = 20;
+export const MIN_MISSION_DRONE_COUNT = 1;
+export const MAX_MISSION_DRONE_COUNT = 50;
+
+export function clampMissionDroneCount(droneCount: number): number {
+  const clampedCount = Math.min(
+    MAX_MISSION_DRONE_COUNT,
+    Math.max(MIN_MISSION_DRONE_COUNT, Math.floor(droneCount))
+  );
+  return clampedCount;
+}
+
+export function createMissionAgentIds(droneCount: number): string[] {
+  const clampedCount = clampMissionDroneCount(droneCount);
+  const agentIds = Array.from({ length: clampedCount }, (_, index) => `agent_${index}`);
+  return agentIds;
+}
+
+export function maxUwbLinksForDroneCount(droneCount: number): number {
+  const graphLimit = Math.max(0, clampMissionDroneCount(droneCount) - 1);
+  const linkLimit = Math.min(UWB_LINKS_PER_AGENT_LIMIT, graphLimit);
+  return linkLimit;
+}
 
 export function maxUwbLinksPerAgentLimit(sceneTrace: SceneTrace): number {
   const agentIds = new Set<string>();
@@ -65,6 +89,7 @@ export function maxUwbLinksPerAgentLimit(sceneTrace: SceneTrace): number {
 
 export function createViewerState(sceneTrace: SceneTrace): ViewerState {
   const linkLimit = maxUwbLinksPerAgentLimit(sceneTrace);
+  const initialMissionDroneCount = clampMissionDroneCount(sceneTrace.truth.nodes.length);
   const maxObservedUwbDegree = Math.max(
     0,
     ...sceneTrace.measurements.uwb.flatMap((link) => [
@@ -80,6 +105,7 @@ export function createViewerState(sceneTrace: SceneTrace): ViewerState {
     sceneTrace,
     selectedIteration: 0,
     playbackSpeed: 1,
+    missionDroneCount: initialMissionDroneCount,
     maxUwbLinksPerAgent: Math.min(linkLimit, maxObservedUwbDegree),
     motionAmplitudeM: 0.24,
     cameraFollowsSwarmBarycenter: true,
@@ -113,6 +139,19 @@ export function createViewerState(sceneTrace: SceneTrace): ViewerState {
     },
     setLayerVisible(layer: keyof LayerVisibility, visible: boolean): void {
       state.layers[layer] = visible;
+    },
+    setMissionDroneCount(droneCount: number): void {
+      state.missionDroneCount = clampMissionDroneCount(droneCount);
+      state.maxUwbLinksPerAgent = Math.min(
+        state.maxUwbLinksPerAgent,
+        maxUwbLinksForDroneCount(state.missionDroneCount)
+      );
+      if (state.selectedNodeId !== null) {
+        const activeAgentIds = new Set(createMissionAgentIds(state.missionDroneCount));
+        if (!activeAgentIds.has(state.selectedNodeId)) {
+          state.selectedNodeId = null;
+        }
+      }
     },
     setMaxUwbLinksPerAgent(linkCount: number): void {
       state.maxUwbLinksPerAgent = Math.min(

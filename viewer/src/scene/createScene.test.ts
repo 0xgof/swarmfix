@@ -160,6 +160,64 @@ describe("createSwarmScene live solve contract", () => {
     expect(groundUncertaintyGroups).toHaveLength(1);
   });
 
+  it("renders GNSS sigma for the active live agents", () => {
+    const selectedLiveFrame: LiveEstimationFrame = {
+      truthPositions: new Map([
+        ["agent_0", [0, 0, 0]],
+        ["agent_1", [2, 0, 0]],
+        ["agent_2", [4, 0, 0]]
+      ]),
+      gnssPositions: new Map([
+        ["agent_0", [0.5, 0, 0]],
+        ["agent_1", [2.3, 0, 0.2]],
+        ["agent_2", [4.2, 0, 0.3]]
+      ]),
+      gnssSigma: new Map([
+        ["agent_0", 1],
+        ["agent_1", 1],
+        ["agent_2", 1]
+      ]),
+      uwbLinks: [],
+      uwbSelection: {
+        candidateLinkCount: 0,
+        selectedLinkCount: 0,
+        maxLinksPerAgent: 0,
+        connectedComponentCount: 3,
+        isolatedAgentCount: 3,
+        triangleCount: 0,
+        addedLinks: 0,
+        droppedLinks: 0,
+        selectionPolicy: "adaptive_range_graph_v1",
+        adaptiveSelectionEnabled: true
+      }
+    };
+
+    const scene = createSwarmScene(
+      sceneTrace,
+      0,
+      uncertaintyOnlyLayers,
+      0,
+      0,
+      0,
+      null,
+      null,
+      selectedLiveFrame
+    );
+    const groundUncertaintyGroups: Group[] = [];
+    scene.traverse((object) => {
+      if (object instanceof Group) {
+        const ringMeshes = object.children.filter((child) => (
+          child instanceof Mesh && child.geometry.type === "RingGeometry"
+        ));
+        if (ringMeshes.length === 4) {
+          groundUncertaintyGroups.push(object);
+        }
+      }
+    });
+
+    expect(groundUncertaintyGroups).toHaveLength(3);
+  });
+
   it("renders the selected live UWB frame instead of rebuilding another graph", () => {
     const selectedLiveFrame: LiveEstimationFrame = {
       truthPositions: new Map([

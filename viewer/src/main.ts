@@ -9,11 +9,17 @@ if (!root) {
 }
 
 let cleanup = (): void => undefined;
+const route = routeForPathname(window.location.pathname);
 
-if (routeForPathname(window.location.pathname) === "catalog") {
+if (route === "catalog") {
   const { CatalogPage } = await import("./catalog/CatalogPage");
   const page = new CatalogPage(root);
   page.mount();
+} else if (route === "newton") {
+  const { NewtonPage } = await import("./newton/NewtonPage");
+  const page = new NewtonPage(root);
+  page.mount();
+  cleanup = () => page.destroy();
 } else {
   const app = new App(root);
   cleanup = () => app.destroy();

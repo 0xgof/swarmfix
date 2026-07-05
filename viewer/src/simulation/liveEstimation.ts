@@ -13,6 +13,9 @@ import {
 } from "./uwbLinkSelection";
 
 const DEFAULT_LIVE_UWB_RANGE_M = Number.POSITIVE_INFINITY;
+const FNV_OFFSET_BASIS = 2166136261;
+const FNV_PRIME = 16777619;
+const UINT32_MAX = 0xffffffff;
 
 export interface LiveUwbLink {
   sourceId: string;
@@ -133,6 +136,52 @@ function gnssOffsetByAgent(sceneTrace: SceneTrace): Map<string, Position3D> {
   return offsets;
 }
 
+function stableUnit(agentId: string,
+                    salt: number): number {
+  const key = `${salt}:${agentId}`;
+  let hash = (FNV_OFFSET_BASIS ^ salt) >>> 0;
+  for (const char of key) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, FNV_PRIME) >>> 0;
+  }
+
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 2246822519) >>> 0;
+  hash ^= hash >>> 13;
+  hash = Math.imul(hash, 3266489917) >>> 0;
+  hash ^= hash >>> 16;
+
+  const unitValue = (hash >>> 0) / UINT32_MAX;
+  return unitValue;
+}
+
+function fallbackGnssOffset(agentId: string,
+                            sigmaM: number): Position3D {
+  const safeSigmaM = Math.max(0.25, sigmaM);
+  const angle = stableUnit(agentId, 131) * Math.PI * 2;
+  const radiusM = safeSigmaM * (0.28 + stableUnit(agentId, 149) * 0.16);
+  const offset: Position3D = [
+    Math.cos(angle) * radiusM,
+    0,
+    Math.sin(angle) * radiusM
+  ];
+  return offset;
+}
+
+function defaultGnssSigma(sceneTrace: SceneTrace): number {
+  const sigmaValues = sceneTrace.measurements.gnss
+    .map((measurement) => measurement.sigma_m)
+    .filter((sigmaM) => Number.isFinite(sigmaM) && sigmaM > 0)
+    .sort((firstSigma, secondSigma) => firstSigma - secondSigma);
+  if (sigmaValues.length === 0) {
+    return 1.0;
+  }
+
+  const middleIndex = Math.floor(sigmaValues.length / 2);
+  const sigmaM = sigmaValues[middleIndex];
+  return sigmaM;
+}
+
 export function buildLiveEstimationFrame(sceneTrace: SceneTrace,
                                          timeSeconds: number,
                                          maxUwbLinksPerAgent: number,
@@ -147,8 +196,11 @@ export function buildLiveEstimationFrame(sceneTrace: SceneTrace,
   const gnssPositions = new Map<string, Position3D>();
   const gnssSigma = new Map<string, number>();
   const actionTruthPositions = suppliedMissionPositions;
+  const activeTruthEntries = actionTruthPositions ?? nominalTruth;
+  const fallbackSigmaM = defaultGnssSigma(sceneTrace);
 
-  for (const [agentId, nominalPosition] of nominalTruth.entries()) {
+  for (const [agentId, activePosition] of activeTruthEntries.entries()) {
+    const nominalPosition = nominalTruth.get(agentId) ?? activePosition;
     const truthPosition = actionTruthPositions?.get(agentId) ?? animatedSwarmPosition(
       agentId,
       nominalPosition,
@@ -157,7 +209,8 @@ export function buildLiveEstimationFrame(sceneTrace: SceneTrace,
     );
     truthPositions.set(agentId, truthPosition);
 
-    const gnssOffset = gnssOffsets.get(agentId) ?? [0, 0, 0];
+    const gnssOffset = gnssOffsets.get(agentId)
+      ?? fallbackGnssOffset(agentId, fallbackSigmaM);
     gnssPositions.set(agentId, [
       truthPosition[0] + gnssOffset[0],
       truthPosition[1] + gnssOffset[1],
@@ -167,6 +220,11 @@ export function buildLiveEstimationFrame(sceneTrace: SceneTrace,
 
   for (const measurement of sceneTrace.measurements.gnss) {
     gnssSigma.set(measurement.agent_id, measurement.sigma_m);
+  }
+  for (const agentId of truthPositions.keys()) {
+    if (!gnssSigma.has(agentId)) {
+      gnssSigma.set(agentId, fallbackSigmaM);
+    }
   }
 
   const candidateMeasurements = liveUwbCandidates(sceneTrace, truthPositions);

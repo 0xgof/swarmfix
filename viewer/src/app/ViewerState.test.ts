@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { SceneTrace } from "../data/sceneTypes";
-import { createViewerState, maxUwbLinksPerAgentLimit } from "./ViewerState";
+import {
+  createMissionAgentIds,
+  createViewerState,
+  maxUwbLinksPerAgentLimit
+} from "./ViewerState";
 import { PlaybackController } from "./PlaybackController";
 
 function sceneWithIterations(iterations: number): SceneTrace {
@@ -98,6 +102,36 @@ describe("viewer state and playback", () => {
     expect(viewerState.missionAction.previousFormation).toBe("grid");
     expect(viewerState.missionAction.motion).toBe("forward");
     expect(viewerState.missionAction.speedMps).toBe(1.5);
+  });
+
+  it("stores stable mission drone count and generated ids separately from formation", () => {
+    const viewerState = createViewerState(sceneWithIterations(1));
+
+    expect(viewerState.missionDroneCount).toBe(1);
+    expect(createMissionAgentIds(viewerState.missionDroneCount)).toEqual(["agent_0"]);
+
+    viewerState.setMissionDroneCount(4);
+    viewerState.setMissionAction({ formation: "ring", motion: "forward", speedMps: 1.5 });
+
+    expect(viewerState.missionDroneCount).toBe(4);
+    expect(createMissionAgentIds(viewerState.missionDroneCount)).toEqual([
+      "agent_0",
+      "agent_1",
+      "agent_2",
+      "agent_3"
+    ]);
+    expect(viewerState.missionAction.formation).toBe("ring");
+    expect(viewerState.missionAction.motion).toBe("forward");
+  });
+
+  it("clamps mission drone count to a bounded positive menu range", () => {
+    const viewerState = createViewerState(sceneWithIterations(1));
+
+    viewerState.setMissionDroneCount(-5);
+    expect(viewerState.missionDroneCount).toBe(1);
+
+    viewerState.setMissionDroneCount(999);
+    expect(viewerState.missionDroneCount).toBe(50);
   });
 
   it("follows the swarm barycenter by default and stores later changes", () => {

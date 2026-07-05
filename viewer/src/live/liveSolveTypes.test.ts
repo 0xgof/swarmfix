@@ -104,6 +104,42 @@ describe("live solve type helpers", () => {
     }]);
   });
 
+  it("builds Python solve requests for generated mission agents", () => {
+    const liveFrame = buildLiveEstimationFrame(
+      sceneTrace,
+      0,
+      4,
+      0,
+      defaultMissionActionState(),
+      {},
+      [],
+      new Map([
+        ["agent_0", [0, 0, 0]],
+        ["agent_1", [3, 0, 0]],
+        ["agent_2", [0, 0, 3]],
+        ["agent_3", [3, 0, 3]]
+      ])
+    );
+
+    const request = buildLiveSolveRequest(sceneTrace, liveFrame, 4);
+
+    expect(request.agents.map((agent) => agent.agent_id)).toEqual([
+      "agent_0",
+      "agent_1",
+      "agent_2",
+      "agent_3"
+    ]);
+    expect(request.gnss.map((measurement) => measurement.agent_id)).toEqual([
+      "agent_0",
+      "agent_1",
+      "agent_2",
+      "agent_3"
+    ]);
+    expect(request.gnss.find((measurement) => (
+      measurement.agent_id === "agent_3"
+    ))?.sigma_m).toBe(1);
+  });
+
   it("keeps mission action state out of live solver request evidence", () => {
     const liveFrame = buildLiveEstimationFrame(
       sceneTrace,

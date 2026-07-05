@@ -334,6 +334,70 @@ describe("App camera lifecycle", () => {
     });
   });
 
+  it("requests backend mission positions for the user-selected drone count", async () => {
+    const positionRequests: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: unknown, init?: { body?: unknown }) => {
+      const url = String(input);
+      if (url.includes("/mission-actions/catalog")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => "",
+          json: async () => ({
+            schema_version: "0.1.0",
+            formations: [],
+            motions: []
+          })
+        };
+      }
+      if (url.includes("/mission-actions/positions") && init?.body) {
+        positionRequests.push(JSON.parse(String(init.body)));
+        return {
+          ok: true,
+          status: 200,
+          text: async () => "",
+          json: async () => ({
+            schema_version: "0.1.0",
+            metadata: {
+              formation: "grid",
+              motion: "random_walk",
+              time_s: 0
+            },
+            positions: Array.from({ length: 4 }, (_, index) => ({
+              agent_id: `agent_${index}`,
+              position_m: [index, 0, 0]
+            }))
+          })
+        };
+      }
+      if (url.includes("/observability/")) {
+        return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
+      }
+      if (url.includes("/solve")) {
+        throw new Error("NetworkError when attempting to fetch resource.");
+      }
+      throw new Error("NetworkError when attempting to fetch resource.");
+    }));
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    app.mount(sceneTrace);
+    const droneCount = root.querySelector<HTMLSelectElement>('[name="missionDroneCount"]')!;
+    droneCount.value = "4";
+    droneCount.dispatchEvent(new Event("change"));
+
+    await vi.waitFor(() => {
+      expect(positionRequests.some((request) => (
+        JSON.stringify(request.agent_ids) === JSON.stringify([
+          "agent_0",
+          "agent_1",
+          "agent_2",
+          "agent_3"
+        ])
+      ))).toBe(true);
+    });
+  });
+
   it("requests backend mission positions at display cadence", async () => {
     const requestAnimationFrameSpy = vi
       .spyOn(window, "requestAnimationFrame")
@@ -642,7 +706,6 @@ describe("App camera lifecycle", () => {
     app.mount(sceneTrace);
     const camera = app.getCameraForTest();
     expect(camera).not.toBeNull();
-    camera!.position.set(0, 0, 18);
     const cameraFollow = app as unknown as CameraFollowTestAccess;
 
     cameraFollow.updateCameraFollowTarget(liveFrameWithHorizontalRadius(5));
@@ -663,6 +726,53 @@ describe("App camera lifecycle", () => {
     expect(distanceAfterLargeExtentChange).toBeLessThan(
       distanceAfterBaselineFrame * 1.6
     );
+  });
+
+  it("keeps a manual zoom distance while following the barycenter", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    app.mount(sceneTrace);
+    const camera = app.getCameraForTest();
+    expect(camera).not.toBeNull();
+    camera!.position.set(0, 0, 18);
+    const cameraFollow = app as unknown as CameraFollowTestAccess;
+
+    cameraFollow.updateCameraFollowTarget(liveFrameWithHorizontalRadius(8));
+    camera!.position.set(0, 0, 11);
+    cameraFollow.updateCameraFollowTarget(liveFrameWithHorizontalRadius(8));
+
+    const distanceAfterManualZoom = cameraDistanceFromFollowTarget(camera!);
+    expect(distanceAfterManualZoom).toBeCloseTo(11, 6);
+  });
+
+  it("lets the follow toggle take charge of zoom again after manual zoom", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    app.mount(sceneTrace);
+    const camera = app.getCameraForTest();
+    expect(camera).not.toBeNull();
+    camera!.position.set(0, 0, 18);
+    const cameraFollow = app as unknown as CameraFollowTestAccess;
+
+    cameraFollow.updateCameraFollowTarget(liveFrameWithHorizontalRadius(8));
+    camera!.position.set(0, 0, 11);
+    cameraFollow.updateCameraFollowTarget(liveFrameWithHorizontalRadius(8));
+    const distanceAfterManualZoom = cameraDistanceFromFollowTarget(camera!);
+
+    const followToggle = root.querySelector<HTMLInputElement>(
+      'input[name="cameraFollowsSwarmBarycenter"]'
+    );
+    expect(followToggle).not.toBeNull();
+    followToggle!.checked = false;
+    followToggle!.dispatchEvent(new Event("change"));
+    followToggle!.checked = true;
+    followToggle!.dispatchEvent(new Event("change"));
+    cameraFollow.updateCameraFollowTarget(liveFrameWithHorizontalRadius(8));
+
+    const distanceAfterRetoggle = cameraDistanceFromFollowTarget(camera!);
+    expect(distanceAfterRetoggle).toBeGreaterThan(distanceAfterManualZoom);
   });
 
   it("renders live solver connection status in the side panel", () => {
