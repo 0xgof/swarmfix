@@ -5,8 +5,8 @@ import { LineBasicMaterial, LineSegments } from "three";
 import { visualTokens } from "../style/visualTokens";
 import { createGrid } from "./grid";
 
-const gridSize = 64;
-const gridDivisions = 32;
+const gridSize = 320;
+const gridDivisions = 160;
 const cellSize = gridSize / gridDivisions;
 const intersectionCount = (gridDivisions + 1) * (gridDivisions + 1);
 

@@ -8,8 +8,8 @@ import {
 
 import { visualTokens } from "../style/visualTokens";
 
-const gridSize = 64;
-const gridDivisions = 32;
+const gridSize = 320;
+const gridDivisions = 160;
 const crossArmM = 0.07;
 const edgeGapM = 0.45;
 const crossOpacity = 0.3;
