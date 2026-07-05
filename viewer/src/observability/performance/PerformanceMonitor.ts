@@ -5,6 +5,11 @@ export interface PerformanceMonitorOptions {
   capacity?: number;
 }
 
+export interface FramePhaseTiming {
+  name: string;
+  durationMs: number;
+}
+
 export interface PerformanceSample {
   sample_id: string;
   trace_id: string;
@@ -84,8 +89,27 @@ export class PerformanceMonitor {
 
   recordFrame(spanId: string,
               durationMs: number,
-              fields: Record<string, unknown> = {}): void {
+              fields: Record<string, unknown> = {},
+              phases: FramePhaseTiming[] = []): void {
     this.recordSample("frame_ms", spanId, durationMs, this.slowFrameMs, fields);
+    if (durationMs <= this.slowFrameMs) {
+      return;
+    }
+
+    for (const phase of phases) {
+      this.recordSample(
+        "frame_phase_ms",
+        `${spanId}:${phase.name}`,
+        phase.durationMs,
+        Number.POSITIVE_INFINITY,
+        {
+          ...fields,
+          phase_name: phase.name,
+          frame_span_id: spanId,
+          frame_duration_ms: durationMs
+        }
+      );
+    }
   }
 
   recordLiveSolve(spanId: string,

@@ -22,6 +22,7 @@ class PerformanceBaselineSummary:
     viewer_session_path: Path | None
     backend_session_path: Path | None
     viewer_metrics: dict[str, dict[str, Any]] = field(default_factory=dict)
+    viewer_phase_metrics: dict[str, dict[str, Any]] = field(default_factory=dict)
     backend_metrics: dict[str, dict[str, Any]] = field(default_factory=dict)
     solver_backends: list[str] = field(default_factory=list)
     selected_uwb_links: dict[str, list[int]] = field(default_factory=dict)
@@ -169,6 +170,27 @@ def _selected_counts_from_viewer(metrics: list[PerformanceMetric]) -> list[int]:
     return sorted_selected_counts
 
 
+def _viewer_phase_metrics(metrics: list[PerformanceMetric]) -> dict[str, dict[str, Any]]:
+    """Summarize viewer slow-frame phase samples by phase name."""
+    phase_metrics: dict[str, list[PerformanceMetric]] = {}
+    for metric in metrics:
+        if metric.metric_name != "frame_phase_ms":
+            continue
+        phase_name = metric.fields.get("phase_name")
+        if not isinstance(phase_name, str):
+            continue
+        phase_group = phase_metrics.get(phase_name, [])
+        phase_group.append(metric)
+        phase_metrics[phase_name] = phase_group
+
+    phase_summaries: dict[str, dict[str, Any]] = {}
+    for phase_name, phase_group in sorted(phase_metrics.items()):
+        phase_summary = summarize_metrics(phase_group).get("frame_phase_ms")
+        if phase_summary:
+            phase_summaries[phase_name] = phase_summary
+    return phase_summaries
+
+
 def summarize_performance_baseline(
         observability_root: Path = Path("logs/observability")) -> PerformanceBaselineSummary:
     """Summarize the latest viewer and backend performance sessions separately."""
@@ -185,6 +207,7 @@ def summarize_performance_baseline(
         diagnostics.append("no backend trace_events.jsonl with live_solve_completed found")
 
     viewer_metrics = summarize_metrics(viewer_samples)
+    viewer_phase_metrics = _viewer_phase_metrics(viewer_samples)
     backend_metrics = summarize_metrics(backend_samples)
     selected_uwb_links = {
         "backend": backend_selected_counts,
@@ -195,6 +218,7 @@ def summarize_performance_baseline(
         viewer_session_path=viewer_session,
         backend_session_path=backend_session,
         viewer_metrics=viewer_metrics,
+        viewer_phase_metrics=viewer_phase_metrics,
         backend_metrics=backend_metrics,
         solver_backends=solver_backends,
         selected_uwb_links=selected_uwb_links,
@@ -231,6 +255,13 @@ def format_performance_baseline(summary: PerformanceBaselineSummary) -> str:
         "viewer:",
         f"  {_format_metric('frame_ms', summary.viewer_metrics)}",
         f"  {_format_metric('live_solve_ms', summary.viewer_metrics)}",
+    ]
+    if summary.viewer_phase_metrics:
+        lines.append("")
+        lines.append("viewer slow-frame phases:")
+        for phase_name, phase_metrics in summary.viewer_phase_metrics.items():
+            lines.append(f"  {_format_metric(phase_name, {phase_name: phase_metrics})}")
+    lines.extend([
         "",
         "backend:",
         f"  {_format_metric('live_solve_completed', summary.backend_metrics)}",
@@ -239,7 +270,7 @@ def format_performance_baseline(summary: PerformanceBaselineSummary) -> str:
         "selected UWB links:",
         f"  viewer: {summary.selected_uwb_links.get('viewer', [])}",
         f"  backend: {summary.selected_uwb_links.get('backend', [])}",
-    ]
+    ])
     if summary.diagnostics:
         lines.append("")
         lines.append("diagnostics:")

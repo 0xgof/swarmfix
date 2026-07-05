@@ -31,6 +31,7 @@ import {
 } from "../observability/eventBuffer";
 import { flushObservationEvents } from "../observability/eventFlush";
 import { PerformanceMonitor } from "../observability/performance/PerformanceMonitor";
+import type { FramePhaseTiming } from "../observability/performance/PerformanceMonitor";
 import { flushPerformanceSamples } from "../observability/performance/performanceFlush";
 import { createCamera } from "../scene/camera";
 import { SwarmSceneRuntime } from "../scene/SwarmSceneRuntime";
@@ -81,6 +82,7 @@ const FAST_MISSION_POSITION_REQUEST_INTERVAL_S = 1 / 30;
 const STATIC_MISSION_POSITION_REQUEST_INTERVAL_S = 1.0;
 const OBSERVABILITY_FLUSH_INTERVAL_MS = 1000;
 type MissionPositionSource = "backend" | "local_fallback";
+type FramePhaseRecorder = (name: string, durationMs: number) => void;
 const CAMERA_FOLLOW_FALLBACK_DIRECTION = (() => {
   const x = 1.0;
   const y = 12.0;
@@ -476,6 +478,16 @@ export class App {
 
     const animate = (): void => {
       const frameStartMs = performance.now();
+      const framePhases: FramePhaseTiming[] = [];
+      const recordPhase: FramePhaseRecorder = (name, durationMs) => {
+        framePhases.push({ name, durationMs });
+      };
+      const timePhase = <T>(name: string, operation: () => T): T => {
+        const phaseStartMs = performance.now();
+        const phaseResult = operation();
+        recordPhase(name, performance.now() - phaseStartMs);
+        return phaseResult;
+      };
       if (
         !this.viewerState
         || !this.renderer
@@ -486,35 +498,46 @@ export class App {
         return;
       }
 
+      const viewerState = this.viewerState;
+      const renderer = this.renderer;
+      const camera = this.camera;
+      const sceneRuntime = this.sceneRuntime;
       const nowMs = performance.now();
       const timeSeconds = (nowMs - this.startedAtMs) / 1000;
-      const displayFrame = this.liveSolveScheduler.getDisplayFrame(nowMs);
-      const liveFrame = this.queueLiveSolve(timeSeconds);
-      this.renderConnectionStatusIfChanged();
-      this.sceneRuntime?.updateFrame({
-        sceneTrace: this.viewerState.sceneTrace,
-        selectedIteration: this.viewerState.selectedIteration,
-        layers: this.viewerState.layers,
+      const displayFrame = timePhase(
+        "display_frame",
+        () => this.liveSolveScheduler.getDisplayFrame(nowMs)
+      );
+      const liveFrame = this.queueLiveSolve(timeSeconds, recordPhase);
+      timePhase("connection_status", () => this.renderConnectionStatusIfChanged());
+      timePhase("scene_update", () => sceneRuntime.updateFrame({
+        sceneTrace: viewerState.sceneTrace,
+        selectedIteration: viewerState.selectedIteration,
+        layers: viewerState.layers,
         timeSeconds,
-        maxUwbLinksPerAgent: this.viewerState.maxUwbLinksPerAgent,
-        motionAmplitudeM: this.viewerState.motionAmplitudeM,
+        maxUwbLinksPerAgent: viewerState.maxUwbLinksPerAgent,
+        motionAmplitudeM: viewerState.motionAmplitudeM,
         displayFrame,
-        missionAction: this.viewerState.missionAction,
+        missionAction: viewerState.missionAction,
         liveFrame
-      });
-      this.updateCameraFollowTarget(liveFrame);
-      this.controls?.update();
-      this.renderer.render(this.sceneRuntime!.scene, this.camera);
+      }));
+      timePhase("camera_follow", () => this.updateCameraFollowTarget(liveFrame));
+      timePhase("orbit_controls", () => this.controls?.update());
+      timePhase("render", () => renderer.render(sceneRuntime.scene, camera));
+      const liveSolveFrameChanged = this.liveSolveScheduler.consumeFrameChanged();
+      timePhase("observability_flush_check", () => this.flushObservability());
       this.performanceMonitor.recordFrame(
         `viewer-frame-${Math.round(timeSeconds * 1000)}`,
         performance.now() - frameStartMs,
         {
           selected_uwb_links: displayFrame?.metadata.selected_uwb_count ?? 0,
+          live_solve_frame_changed: liveSolveFrameChanged,
+          ...this.uwbSelectionFields(),
           ...this.actionContextFields()
-        }
+        },
+        framePhases
       );
-      this.flushObservability();
-      if (this.liveSolveScheduler.consumeFrameChanged()) {
+      if (liveSolveFrameChanged) {
         this.publishNewtonState(timeSeconds);
         this.renderConnectionStatusIfChanged();
         this.renderInspector();
@@ -577,48 +600,61 @@ export class App {
     return diagnostics;
   }
 
-  private queueLiveSolve(timeSeconds: number): LiveEstimationFrame | null {
+  private queueLiveSolve(timeSeconds: number,
+                         recordPhase: FramePhaseRecorder | null = null): LiveEstimationFrame | null {
     if (!this.viewerState) {
       return null;
     }
 
-    this.requestBackendMissionPositions(timeSeconds);
-    const missionPositions = this.missionPositionsForLiveFrame(timeSeconds);
-    const liveFrame = buildLiveEstimationFrame(
-      this.viewerState.sceneTrace,
-      timeSeconds,
-      this.viewerState.maxUwbLinksPerAgent,
-      this.viewerState.motionAmplitudeM,
-      this.viewerState.missionAction,
-      {},
-      this.previousSelectedUwbLinks,
-      missionPositions
+    const timePhase = <T>(name: string, operation: () => T): T => {
+      const phaseStartMs = performance.now();
+      const phaseResult = operation();
+      recordPhase?.(name, performance.now() - phaseStartMs);
+      return phaseResult;
+    };
+    const missionPositions = timePhase("mission_positions", () => {
+      this.requestBackendMissionPositions(timeSeconds);
+      const positions = this.missionPositionsForLiveFrame(timeSeconds);
+      return positions;
+    });
+    const liveFrame = timePhase("live_frame_build", () => buildLiveEstimationFrame(
+        this.viewerState!.sceneTrace,
+        timeSeconds,
+        this.viewerState!.maxUwbLinksPerAgent,
+        this.viewerState!.motionAmplitudeM,
+        this.viewerState!.missionAction,
+        {},
+        this.previousSelectedUwbLinks,
+        missionPositions
+      )
     );
     this.previousSelectedUwbLinks = liveFrame.uwbLinks;
     this.latestUwbSelection = liveFrame.uwbSelection;
     if (this.linkCountControl) {
       updateLinkCountDiagnostics(this.linkCountControl, this.linkCountDiagnostics());
     }
-    void this.liveSolveScheduler.tick(performance.now(), () => {
-      const request = buildLiveSolveRequest(
-        this.viewerState!.sceneTrace,
-        liveFrame,
-        this.viewerState!.maxUwbLinksPerAgent
-      );
-      request.trace_context = {
-        session_id: this.observabilitySession.sessionId,
-        trace_id: this.observabilitySession.traceId,
-        span_id: `viewer-live-solve-${Math.round(timeSeconds * 1000)}`,
-        correlation_id: (
-          `${this.viewerState!.sceneTrace.metadata.scenario}`
-          + `-links_per_drone_${this.viewerState!.maxUwbLinksPerAgent}`
-        ),
-        request_id: `solve-${Math.round(performance.now())}`,
-        scenario: this.viewerState!.sceneTrace.metadata.scenario
-      };
-      this.latestLiveSolveRequest = request;
-      this.publishNewtonState(timeSeconds, request);
-      return request;
+    timePhase("live_solve_scheduler", () => {
+      void this.liveSolveScheduler.tick(performance.now(), () => {
+        const request = buildLiveSolveRequest(
+          this.viewerState!.sceneTrace,
+          liveFrame,
+          this.viewerState!.maxUwbLinksPerAgent
+        );
+        request.trace_context = {
+          session_id: this.observabilitySession.sessionId,
+          trace_id: this.observabilitySession.traceId,
+          span_id: `viewer-live-solve-${Math.round(timeSeconds * 1000)}`,
+          correlation_id: (
+            `${this.viewerState!.sceneTrace.metadata.scenario}`
+            + `-links_per_drone_${this.viewerState!.maxUwbLinksPerAgent}`
+          ),
+          request_id: `solve-${Math.round(performance.now())}`,
+          scenario: this.viewerState!.sceneTrace.metadata.scenario
+        };
+        this.latestLiveSolveRequest = request;
+        this.publishNewtonState(timeSeconds, request);
+        return request;
+      });
     });
     return liveFrame;
   }

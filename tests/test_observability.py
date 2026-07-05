@@ -274,6 +274,7 @@ def test_performance_baseline_summarizes_viewer_samples_and_backend_events(
     assert summary.viewer_metrics["frame_ms"]["count"] == 5
     assert summary.viewer_metrics["frame_ms"]["p95"] == 100.0
     assert summary.viewer_metrics["live_solve_ms"]["count"] == 1
+    assert summary.viewer_phase_metrics == {}
     assert summary.backend_metrics["live_solve_completed"]["count"] == 3
     assert summary.backend_metrics["live_solve_completed"]["max"] == 8.0
     assert summary.solver_backends == ["c-uwb-gnss"]
@@ -332,6 +333,62 @@ def test_performance_baseline_keeps_viewer_and_backend_metrics_separate(
 
     assert summary.viewer_metrics["live_solve_ms"]["max"] == 300.0
     assert summary.backend_metrics["live_solve_completed"]["max"] == 5.0
+
+
+def test_performance_baseline_reports_slow_frame_phase_metrics(tmp_path: Path) -> None:
+    session = tmp_path / "session-viewer"
+    session.mkdir()
+    samples = [
+        {
+            "trace_id": "trace-viewer",
+            "span_id": "frame-1",
+            "component": "viewer",
+            "metric_name": "frame_ms",
+            "duration_ms": 80.0,
+            "slow_threshold_ms": 33.0,
+            "fields": {"selected_uwb_links": 40},
+        },
+        {
+            "trace_id": "trace-viewer",
+            "span_id": "frame-1:live_frame_build",
+            "component": "viewer",
+            "metric_name": "frame_phase_ms",
+            "duration_ms": 22.0,
+            "slow_threshold_ms": None,
+            "fields": {
+                "phase_name": "live_frame_build",
+                "frame_span_id": "frame-1",
+                "selected_uwb_links": 40,
+            },
+        },
+        {
+            "trace_id": "trace-viewer",
+            "span_id": "frame-1:scene_update",
+            "component": "viewer",
+            "metric_name": "frame_phase_ms",
+            "duration_ms": 41.0,
+            "slow_threshold_ms": None,
+            "fields": {
+                "phase_name": "scene_update",
+                "frame_span_id": "frame-1",
+                "selected_uwb_links": 40,
+            },
+        },
+    ]
+    (session / "performance_samples.jsonl").write_text(
+        "".join(json.dumps(sample) + "\n" for sample in samples),
+        encoding="utf-8",
+    )
+
+    summary = summarize_performance_baseline(tmp_path)
+    formatted_summary = format_performance_baseline(summary)
+
+    assert summary.viewer_phase_metrics["live_frame_build"]["count"] == 1
+    assert summary.viewer_phase_metrics["live_frame_build"]["max"] == 22.0
+    assert summary.viewer_phase_metrics["scene_update"]["p95"] == 41.0
+    assert "viewer slow-frame phases:" in formatted_summary
+    assert "live_frame_build: n=1 p50=22.0ms" in formatted_summary
+    assert "scene_update: n=1 p50=41.0ms" in formatted_summary
 
 
 def test_pyproject_declares_performance_baseline_console_script() -> None:
