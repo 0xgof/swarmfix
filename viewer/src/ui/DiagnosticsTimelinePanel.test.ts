@@ -62,6 +62,24 @@ describe("DiagnosticsTimelinePanel", () => {
     expect(panel.element.querySelectorAll("path.diagnostics-timeline-path")).toHaveLength(4);
     expect(panel.element.querySelectorAll("path.diagnostics-timeline-path-secondary")).toHaveLength(1);
     expect(panel.element.querySelectorAll("path.diagnostics-timeline-path-solver")).toHaveLength(1);
+    const errorPlot = Array.from(panel.element.querySelectorAll(".diagnostics-timeline-plot"))
+      .find((plot) => plot.textContent?.includes("display tracking error"));
+    const floor = errorPlot?.querySelector("rect.diagnostics-timeline-zero-floor");
+    expect(floor).not.toBeNull();
+    expect(Number(floor?.getAttribute("height"))).toBeGreaterThan(0);
+    const floorBottom = (
+      Number(floor?.getAttribute("y"))
+      + Number(floor?.getAttribute("height"))
+    );
+    expect(floorBottom).toBeCloseTo(86);
+    const zeroLabel = errorPlot?.querySelector("text.diagnostics-timeline-zero-label");
+    expect(zeroLabel?.textContent).toBe("0");
+    const gnssLabel = errorPlot?.querySelector("text.diagnostics-timeline-gnss-label");
+    expect(gnssLabel?.textContent).toBe("GNSS 1.200 m");
+    const gnssPath = errorPlot?.querySelector("path.diagnostics-timeline-path-secondary");
+    const gnssPathCoordinates = gnssPath?.getAttribute("d")?.split(" ") ?? [];
+    const latestGnssLineY = Number(gnssPathCoordinates[gnssPathCoordinates.length - 1]);
+    expect(Number(gnssLabel?.getAttribute("y"))).toBeLessThan(latestGnssLineY);
     expect(
       panel.element.querySelector(".diagnostics-timeline-path-solver")
         ?.getAttribute("stroke-dasharray")

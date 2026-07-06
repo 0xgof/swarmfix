@@ -132,12 +132,66 @@ interface PlotLegendItem {
   label: string;
 }
 
+interface PlotOptions {
+  zeroFloor?: boolean;
+}
+
+function rangeWithZeroFloor(range: { min: number; max: number }): { min: number; max: number } {
+  const positiveExtent = Math.max(range.max, Math.abs(range.min), 1e-9);
+  const floorDepth = positiveExtent * 0.18;
+  const headroom = positiveExtent * 0.18;
+  const floorRange = {
+    min: Math.min(range.min, -floorDepth),
+    max: Math.max(range.max + headroom, 0)
+  };
+  return floorRange;
+}
+
+function yForValue(value: number, range: { min: number; max: number }): number {
+  const valueSpan = Math.max(1e-9, range.max - range.min);
+  const height = VIEWBOX_HEIGHT - PLOT_PADDING_Y * 2;
+  const normalizedY = (value - range.min) / valueSpan;
+  const y = VIEWBOX_HEIGHT - PLOT_PADDING_Y - normalizedY * height;
+  return y;
+}
+
+function appendZeroFloor(svg: SVGSVGElement, range: { min: number; max: number }): void {
+  const zeroY = yForValue(0, range);
+  const floorBottomY = VIEWBOX_HEIGHT;
+  const floorHeight = Math.max(0, floorBottomY - zeroY);
+  if (floorHeight <= 0) {
+    return;
+  }
+
+  const floor = document.createElementNS(SVG_NS, "rect");
+  floor.setAttribute("class", "diagnostics-timeline-zero-floor");
+  floor.setAttribute("x", String(PLOT_PADDING_X));
+  floor.setAttribute("y", zeroY.toFixed(2));
+  floor.setAttribute("width", String(VIEWBOX_WIDTH - PLOT_PADDING_X * 2));
+  floor.setAttribute("height", floorHeight.toFixed(2));
+  svg.append(floor);
+}
+
+function appendPlotLabel(svg: SVGSVGElement,
+                         className: string,
+                         textContent: string,
+                         y: number): void {
+  const label = document.createElementNS(SVG_NS, "text");
+  const boundedY = Math.min(VIEWBOX_HEIGHT - 4, Math.max(PLOT_PADDING_Y + 4, y));
+  label.setAttribute("class", className);
+  label.setAttribute("x", "4");
+  label.setAttribute("y", boundedY.toFixed(2));
+  label.textContent = textContent;
+  svg.append(label);
+}
+
 function createPlot(title: string,
                     currentText: string,
                     samples: ViewerDiagnosticSample[],
                     readValue: SampleValueReader,
                     secondarySeries: SecondaryPlotSeries[] = [],
-                    legendItems: PlotLegendItem[] = []): HTMLElement {
+                    legendItems: PlotLegendItem[] = [],
+                    options: PlotOptions = {}): HTMLElement {
   const section = document.createElement("section");
   section.className = "diagnostics-timeline-plot";
   const header = document.createElement("div");
@@ -169,12 +223,36 @@ function createPlot(title: string,
     }
     return values;
   });
-  const sharedRange = valueRange(rangeValues);
+  const baseRange = valueRange(rangeValues);
+  const sharedRange = options.zeroFloor
+    ? rangeWithZeroFloor(baseRange)
+    : baseRange;
+  if (options.zeroFloor) {
+    appendZeroFloor(svg, sharedRange);
+    appendPlotLabel(
+      svg,
+      "diagnostics-timeline-zero-label",
+      "0",
+      yForValue(0, sharedRange) - 3
+    );
+  }
   const path = document.createElementNS(SVG_NS, "path");
   path.setAttribute("class", "diagnostics-timeline-path");
   path.setAttribute("d", pathForSeries(samples, readValue, sharedRange));
   svg.append(path);
   for (const series of secondarySeries) {
+    if (options.zeroFloor && series.label === "GNSS") {
+      const latestSample = samples[samples.length - 1];
+      const latestValue = series.readValue(latestSample);
+      if (isFiniteNumber(latestValue)) {
+        appendPlotLabel(
+          svg,
+          "diagnostics-timeline-gnss-label",
+          series.currentText,
+          yForValue(latestValue, sharedRange) - 3
+        );
+      }
+    }
     const secondaryPath = document.createElementNS(SVG_NS, "path");
     secondaryPath.setAttribute(
       "class",
@@ -298,7 +376,8 @@ export class DiagnosticsTimelinePanel {
         samples,
         (sample) => sample.errorRmseM,
         errorOverlays,
-        errorLegendItems
+        errorLegendItems,
+        { zeroFloor: true }
       )
     );
   }

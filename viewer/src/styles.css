@@ -117,6 +117,28 @@ body {
   vector-effect: non-scaling-stroke;
 }
 
+.diagnostics-timeline-zero-floor {
+  fill: #e6e8eb;
+  opacity: 0.85;
+}
+
+.diagnostics-timeline-zero-label,
+.diagnostics-timeline-gnss-label {
+  font-size: 9px;
+  font-weight: 500;
+  paint-order: stroke;
+  stroke: #fbfbf8;
+  stroke-width: 3px;
+}
+
+.diagnostics-timeline-zero-label {
+  fill: #a8adb3;
+}
+
+.diagnostics-timeline-gnss-label {
+  fill: #b24b24;
+}
+
 .diagnostics-timeline-path-secondary {
   stroke: #b24b24;
   stroke-dasharray: 6 4;
