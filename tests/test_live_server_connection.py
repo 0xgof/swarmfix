@@ -97,6 +97,22 @@ def test_live_server_rejects_unknown_solver_backend_before_serving() -> None:
         create_live_server(host="127.0.0.1", port=0, solver_backend_name="missing")
 
 
+def test_live_server_request_threads_do_not_survive_process_shutdown() -> None:
+    """Ctrl+C shutdown should not wait on stale request worker threads."""
+    from swarmfix.live.server import create_live_server
+
+    server = create_live_server(
+        host="127.0.0.1",
+        port=0,
+        solver_backend_name="python-scipy",
+    )
+    try:
+        assert server.daemon_threads is True
+        assert server.block_on_close is False
+    finally:
+        server.server_close()
+
+
 def test_live_server_parser_defaults_to_c_solver_backend() -> None:
     """Starting the live server without an override should select the C backend."""
     from swarmfix.live.server import build_parser

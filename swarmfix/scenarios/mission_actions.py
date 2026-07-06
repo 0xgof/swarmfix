@@ -8,7 +8,15 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-FormationMode = Literal["grid", "line", "column", "wedge", "ring", "random_cloud"]
+FormationMode = Literal[
+    "grid",
+    "line",
+    "column",
+    "wedge",
+    "ring",
+    "square_patrol",
+    "random_cloud",
+]
 MotionMode = Literal["static", "random_walk", "forward", "path_follow"]
 PathMode = Literal["loop", "waypoints"]
 GeometryRisk = Literal["low", "medium", "high"]
@@ -174,6 +182,31 @@ def _random_cloud_offset(agent_id: str,
     return offset
 
 
+def _square_patrol_offset(agent_id: str,
+                          index: int,
+                          count: int,
+                          spacing_m: float) -> Position3D:
+    """Return four square corners plus deterministic interior rover slots."""
+    if count < 5:
+        raise ValueError("square_patrol formation requires at least 5 agents")
+
+    square_corners = [
+        (-spacing_m, 0.0, -spacing_m),
+        (spacing_m, 0.0, -spacing_m),
+        (spacing_m, 0.0, spacing_m),
+        (-spacing_m, 0.0, spacing_m),
+    ]
+    if index < len(square_corners):
+        return square_corners[index]
+
+    interior_scale = spacing_m * 0.55
+    x = (_stable_unit(agent_id, 97) - 0.5) * interior_scale * 2.0
+    z = (_stable_unit(agent_id, 109) - 0.5) * interior_scale * 2.0
+    y = (_stable_unit(agent_id, 113) - 0.5) * spacing_m * 0.2
+    offset = (x, y, z)
+    return offset
+
+
 def _add_position(a: Position3D,
                   b: Position3D) -> Position3D:
     """Add two 3D positions."""
@@ -204,6 +237,31 @@ def _random_walk_offset(agent_id: str,
     z = math.cos(time_seconds * 0.49 + phase * 1.3) * amplitude_m
     offset = (x, y, z)
     return offset
+
+
+def _clamp(value: float,
+           lower_bound: float,
+           upper_bound: float) -> float:
+    """Clamp a scalar into an inclusive range."""
+    clamped_value = min(upper_bound, max(lower_bound, value))
+    return clamped_value
+
+
+def _square_patrol_random_walk_offset(agent_id: str,
+                                      formation_offset: Position3D,
+                                      time_seconds: float,
+                                      amplitude_m: float,
+                                      spacing_m: float) -> Position3D:
+    """Return drift that keeps an interior rover inside the square."""
+    raw_drift = _random_walk_offset(agent_id, time_seconds, amplitude_m)
+    candidate_x = _clamp(formation_offset[0] + raw_drift[0], -spacing_m, spacing_m)
+    candidate_z = _clamp(formation_offset[2] + raw_drift[2], -spacing_m, spacing_m)
+    drift = (
+        candidate_x - formation_offset[0],
+        raw_drift[1],
+        candidate_z - formation_offset[2],
+    )
+    return drift
 
 
 def mission_action_catalog() -> MissionActionCatalog:
@@ -242,6 +300,14 @@ def mission_action_catalog() -> MissionActionCatalog:
             label="ring",
             description="Agents distributed around a circle.",
             geometry_traits=["planar", "supports_closed_loops"],
+            solver_geometry_risk="low",
+        ),
+        MissionActionOption(
+            id="square_patrol",
+            label="square patrol",
+            description="Four corner agents hold a square while additional agents roam inside.",
+            parameters=["random_walk_amplitude_m"],
+            geometry_traits=["planar", "bounded", "requires_5_agents"],
             solver_geometry_risk="low",
         ),
         MissionActionOption(
@@ -300,6 +366,8 @@ def formation_offsets(agent_ids: list[str],
             offset = _wedge_offset(index, spacing_m)
         elif formation == "ring":
             offset = _ring_offset(index, count, spacing_m)
+        elif formation == "square_patrol":
+            offset = _square_patrol_offset(agent_id, index, count, spacing_m)
         elif formation == "random_cloud":
             offset = _random_cloud_offset(agent_id, spacing_m)
         else:
@@ -352,6 +420,8 @@ def mission_action_positions(agent_ids: list[str],
         )
 
     positions: dict[str, Position3D] = {}
+    ordered_ids = _ordered_agent_ids(agent_ids)
+    square_patrol_corners = set(ordered_ids[:4]) if state.formation == "square_patrol" else set()
     for agent_id in agent_ids:
         current_offset = current_offsets.get(agent_id, (0.0, 0.0, 0.0))
         previous_offset = (
@@ -364,15 +434,24 @@ def mission_action_positions(agent_ids: list[str],
             current_offset,
             transition_progress,
         )
-        drift_offset = (
-            _random_walk_offset(
-                agent_id,
-                time_seconds,
-                state.random_walk_amplitude_m,
-            )
-            if state.motion == "random_walk"
-            else (0.0, 0.0, 0.0)
-        )
+        drift_offset = (0.0, 0.0, 0.0)
+        if state.motion == "random_walk":
+            if agent_id in square_patrol_corners:
+                drift_offset = (0.0, 0.0, 0.0)
+            elif state.formation == "square_patrol":
+                drift_offset = _square_patrol_random_walk_offset(
+                    agent_id,
+                    formation_offset,
+                    time_seconds,
+                    state.random_walk_amplitude_m,
+                    state.spacing_m,
+                )
+            else:
+                drift_offset = _random_walk_offset(
+                    agent_id,
+                    time_seconds,
+                    state.random_walk_amplitude_m,
+                )
         position = _add_position(_add_position(center, formation_offset), drift_offset)
         positions[agent_id] = position
 

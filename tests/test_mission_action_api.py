@@ -60,6 +60,7 @@ def test_mission_action_catalog_endpoint_returns_only_catalog_data() -> None:
         "column",
         "wedge",
         "ring",
+        "square_patrol",
         "random_cloud",
     ]
     assert [option["id"] for option in payload["motions"]] == [

@@ -27,6 +27,7 @@ def test_backend_mission_action_catalog_exposes_supported_modes() -> None:
         "column",
         "wedge",
         "ring",
+        "square_patrol",
         "random_cloud",
     ]
     assert [motion.id for motion in catalog.motions] == [
@@ -38,6 +39,22 @@ def test_backend_mission_action_catalog_exposes_supported_modes() -> None:
     line = next(formation for formation in catalog.formations if formation.id == "line")
     assert line.solver_geometry_risk == "high"
     assert "collinear" in line.geometry_traits
+
+
+def test_backend_square_patrol_requires_interior_rover_and_locks_corners() -> None:
+    from swarmfix.scenarios.mission_actions import formation_offsets
+
+    offsets = formation_offsets(AGENT_IDS, "square_patrol", spacing_m=3.0)
+
+    assert offsets["agent_0"] == pytest.approx((-3.0, 0.0, -3.0))
+    assert offsets["agent_1"] == pytest.approx((3.0, 0.0, -3.0))
+    assert offsets["agent_2"] == pytest.approx((3.0, 0.0, 3.0))
+    assert offsets["agent_3"] == pytest.approx((-3.0, 0.0, 3.0))
+    assert -3.0 < offsets["agent_4"][0] < 3.0
+    assert -3.0 < offsets["agent_4"][2] < 3.0
+
+    with pytest.raises(ValueError, match="at least 5"):
+        formation_offsets(AGENT_IDS[:4], "square_patrol", spacing_m=3.0)
 
 
 def test_backend_grid_offsets_match_current_viewer_visible_layout() -> None:
@@ -152,6 +169,26 @@ def test_backend_random_walk_uses_agent_specific_motion() -> None:
 
     assert len(set(motion_deltas)) > 1
     assert max(displacement_m) > 0.2
+
+
+def test_backend_square_patrol_random_walk_moves_only_inside_agents() -> None:
+    from swarmfix.scenarios.mission_actions import MissionActionState, mission_action_positions
+
+    state = MissionActionState(
+        formation="square_patrol",
+        motion="random_walk",
+        spacing_m=3.0,
+        random_walk_amplitude_m=1.0,
+    )
+
+    start_positions = mission_action_positions(AGENT_IDS, state, 1.0)
+    later_positions = mission_action_positions(AGENT_IDS, state, 2.0)
+
+    for agent_id in AGENT_IDS[:4]:
+        assert later_positions[agent_id] == pytest.approx(start_positions[agent_id])
+    assert later_positions["agent_4"] != pytest.approx(start_positions["agent_4"])
+    assert -3.0 <= later_positions["agent_4"][0] <= 3.0
+    assert -3.0 <= later_positions["agent_4"][2] <= 3.0
 
 
 def test_backend_transition_interpolates_between_formations() -> None:

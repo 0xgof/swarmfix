@@ -136,6 +136,9 @@ class LiveSolveHandler(BaseHTTPRequestHandler):
 class LiveSolveServer(ThreadingHTTPServer):
     """HTTP server carrying the selected live-solver backend."""
 
+    daemon_threads = True
+    block_on_close = False
+
     def __init__(self,
                  server_address: tuple[str, int],
                  handler_class: type[BaseHTTPRequestHandler],
