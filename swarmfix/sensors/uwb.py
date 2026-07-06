@@ -25,7 +25,9 @@ def simulate_uwb(scenario: Scenario,
                  missing_link_probability: float = 0.0,
                  nlos_probability: float = 0.0,
                  nlos_positive_bias_m: float = 0.0) -> MeasurementSet:
+
     """Generate UWB range measurements from topology or max-range links."""
+
     if sigma_m <= 0.0:
         raise ValueError("sigma_m must be positive")
     if not 0.0 <= missing_link_probability <= 1.0:
@@ -34,8 +36,10 @@ def simulate_uwb(scenario: Scenario,
         raise ValueError("nlos_probability must be between 0 and 1")
     if nlos_positive_bias_m < 0.0:
         raise ValueError("nlos_positive_bias_m must be non-negative")
+    
     rng = np.random.default_rng(seed)
     measurements = []
+
     for edge in _measurement_edges(scenario, max_range_m):
         if rng.random() < missing_link_probability:
             continue
@@ -43,13 +47,13 @@ def simulate_uwb(scenario: Scenario,
         noise_m = rng.normal(0.0, sigma_m)
         nlos_bias_m = nlos_positive_bias_m if rng.random() < nlos_probability else 0.0
         measured_distance_m = max(true_distance_m + noise_m + nlos_bias_m, 1e-9)
-        measurement = UwbRangeMeasurement(
-            source_id=edge.source_id,
-            target_id=edge.target_id,
-            distance_m=float(measured_distance_m),
-            sigma_m=sigma_m,
-            true_distance_m=true_distance_m,
-        )
+        measurement = UwbRangeMeasurement(source_id=edge.source_id,
+                                            target_id=edge.target_id,
+                                            distance_m=float(measured_distance_m),
+                                            sigma_m=sigma_m,
+                                            true_distance_m=true_distance_m)
+        
         measurements.append(measurement)
     measurement_set = MeasurementSet(uwb=measurements)
+    
     return measurement_set
