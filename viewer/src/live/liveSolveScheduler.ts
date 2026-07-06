@@ -2,7 +2,8 @@ import type { LiveSolveRequest, LiveSolveResponse } from "./liveSolveTypes";
 import { interpolateLiveSolveResponse } from "./liveSolveInterpolation";
 
 export type LiveSolveStatus = "idle" | "solving" | "ready" | "stale" | "retrying";
-export type LiveSolveClient = (request: LiveSolveRequest) => Promise<LiveSolveResponse>;
+export type LiveSolveClient<TRequest = LiveSolveRequest> =
+  (request: TRequest) => Promise<LiveSolveResponse>;
 export type LiveSolveHealthCheck = () => Promise<void>;
 export type LiveSolveClock = () => number;
 
@@ -14,8 +15,8 @@ export interface LiveSolveSchedulerOptions {
   displayTransitionMs?: number;
 }
 
-export class LiveSolveScheduler {
-  private client: LiveSolveClient;
+export class LiveSolveScheduler<TRequest = LiveSolveRequest> {
+  private client: LiveSolveClient<TRequest>;
   private intervalMs: number;
   private previousSolvedFrame: LiveSolveResponse | null;
   private latestSolvedFrame: LiveSolveResponse | null;
@@ -35,7 +36,7 @@ export class LiveSolveScheduler {
   private clock: LiveSolveClock;
   private displayTransitionMs: number;
 
-  constructor(client: LiveSolveClient,
+  constructor(client: LiveSolveClient<TRequest>,
               intervalMs = 250,
               initialSolvedFrame: LiveSolveResponse | null = null,
               options: LiveSolveSchedulerOptions = {}) {
@@ -60,7 +61,7 @@ export class LiveSolveScheduler {
     this.displayTransitionMs = options.displayTransitionMs ?? intervalMs;
   }
 
-  async requestNow(request: LiveSolveRequest): Promise<void> {
+  async requestNow(request: TRequest): Promise<void> {
     if (this.status === "retrying") {
       return;
     }
@@ -97,7 +98,7 @@ export class LiveSolveScheduler {
   }
 
   async tick(nowMs: number,
-             requestFactory: () => LiveSolveRequest): Promise<void> {
+             requestFactory: () => TRequest): Promise<void> {
     this.lastTickMs = nowMs;
     if (this.status === "retrying") {
       await this.tryRecoverCircuit(nowMs, requestFactory);
@@ -113,7 +114,7 @@ export class LiveSolveScheduler {
   }
 
   private async tryRecoverCircuit(nowMs: number,
-                                  requestFactory: () => LiveSolveRequest): Promise<void> {
+                                  requestFactory: () => TRequest): Promise<void> {
     if (this.healthProbeInFlight) {
       return;
     }

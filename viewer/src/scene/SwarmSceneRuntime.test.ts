@@ -119,6 +119,42 @@ function positionsFromGeometry(line: Line): number[] {
   return positions;
 }
 
+const defaultUwbSelection = {
+  candidateLinkCount: 1,
+  selectedLinkCount: 1,
+  maxLinksPerAgent: 1,
+  connectedComponentCount: 1,
+  isolatedAgentCount: 0,
+  triangleCount: 0,
+  addedLinks: 1,
+  droppedLinks: 0,
+  selectionPolicy: "adaptive_range_graph_v1" as const,
+  adaptiveSelectionEnabled: true as const
+};
+
+function makeLiveFrame(overrides: Partial<LiveEstimationFrame> = {}): LiveEstimationFrame {
+  const base: LiveEstimationFrame = {
+    truthPositions: new Map<string, Position3D>([
+      ["agent_0", [0, 0, 0]],
+      ["agent_1", [2, 0, 0]]
+    ]),
+    gnssPositions: new Map<string, Position3D>([
+      ["agent_0", [0.1, 0, 0]],
+      ["agent_1", [2.1, 0, 0]]
+    ]),
+    gnssSigma: new Map<string, number>([["agent_0", 1], ["agent_1", 1]]),
+    uwbLinks: [{
+      sourceId: "agent_0",
+      targetId: "agent_1",
+      measuredDistanceM: 2,
+      sigmaM: 0.1,
+      selectionReason: "new"
+    }],
+    uwbSelection: defaultUwbSelection
+  };
+  return { ...base, ...overrides };
+}
+
 describe("SwarmSceneRuntime", () => {
   it("reuses one scene object across frame updates", () => {
     const runtime = new SwarmSceneRuntime();
@@ -132,7 +168,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
     const firstScene = runtime.scene;
     runtime.updateFrame({
@@ -144,7 +180,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
 
     expect(runtime.scene).toBe(firstScene);
@@ -162,7 +198,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
     const geometry = firstGeometry(runtime.scene);
     expect(geometry).not.toBeNull();
@@ -177,7 +213,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame: null,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
     runtime.dispose();
 
@@ -261,7 +297,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame: null,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
     const visibleMarker = objectByUserData(runtime.scene, (userData) => (
       userData.kind === "node"
@@ -279,7 +315,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
     const hiddenMarker = objectByUserData(runtime.scene, (userData) => (
       userData.kind === "node"
@@ -308,7 +344,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame: null,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
     runtime.updateFrame({
       sceneTrace: nextTrace,
@@ -319,7 +355,12 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame: null,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame({
+        truthPositions: new Map<string, Position3D>([["agent_2", [8, 0, 0]]]),
+        gnssPositions: new Map<string, Position3D>([["agent_2", [8, 0, 0]]]),
+        gnssSigma: new Map<string, number>([["agent_2", 1]]),
+        uwbLinks: []
+      })
     });
 
     expect(objectByUserData(runtime.scene, (userData) => userData.agentId === "agent_0"))
@@ -340,7 +381,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame: null,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
     const firstLink = objectByUserData(runtime.scene, (userData) => (
       userData.kind === "edge"
@@ -359,7 +400,19 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame: null,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame({
+        truthPositions: new Map<string, Position3D>([
+          ["agent_0", [0, 0, 0]],
+          ["agent_1", [3, 0, 0]]
+        ]),
+        uwbLinks: [{
+          sourceId: "agent_0",
+          targetId: "agent_1",
+          measuredDistanceM: 3,
+          sigmaM: 0.1,
+          selectionReason: "retained"
+        }]
+      })
     });
     const secondLink = objectByUserData(runtime.scene, (userData) => (
       userData.kind === "edge"
@@ -387,7 +440,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame: null,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
     const firstLink = (
       objectByUserData(runtime.scene, (userData) => userData.kind === "edge") as Line | null
@@ -404,7 +457,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame: null,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame({ uwbLinks: [] })
     });
 
     expect(disposeSpy).toHaveBeenCalled();
@@ -426,7 +479,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
     const positionError = objectByUserData(runtime.scene, (userData) => (
       userData.kind === "position-error"
@@ -442,7 +495,7 @@ describe("SwarmSceneRuntime", () => {
       motionAmplitudeM: 0.24,
       displayFrame,
       missionAction: null,
-      liveFrame: null
+      liveFrame: makeLiveFrame()
     });
 
     expect(objectByUserData(runtime.scene, (userData) => userData.kind === "position-error"))

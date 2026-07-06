@@ -446,7 +446,7 @@ describe("App camera lifecycle", () => {
       if (url.includes("/observability/")) {
         return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
       }
-      if (url.includes("/solve")) {
+      if (url.includes("/live/frame")) {
         solveEndpoint = url;
         throw new Error("NetworkError when attempting to fetch resource.");
       }
@@ -469,7 +469,7 @@ describe("App camera lifecycle", () => {
       expect(positionsRequestBody).not.toBeNull();
     });
     await vi.waitFor(() => {
-      expect(solveEndpoint).toBe("http://127.0.0.1:8765/solve");
+      expect(solveEndpoint).toBe("http://127.0.0.1:8765/live/frame");
     });
 
     expect(positionsRequestBody).toMatchObject({
@@ -1051,6 +1051,18 @@ describe("App camera lifecycle", () => {
     expect(connectionStatus!.textContent).toContain("Live solver:");
   });
 
+  it("does not show the exported trace iteration slider in the live side panel", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    app.mount(sceneTrace);
+
+    const sidePanel = root.querySelector<HTMLElement>(".side-panel");
+    expect(sidePanel).not.toBeNull();
+    expect(sidePanel!.textContent).not.toContain("exported trace iteration");
+    expect(sidePanel!.textContent).not.toContain("Inspects exported trace state");
+  });
+
   it("mounts diagnostics plots at the bottom of the main viewport outside the side panel", () => {
     const root = document.createElement("div");
     const app = createTestApp(root);
@@ -1407,7 +1419,7 @@ describe("App live solve failure observability", () => {
         (candidate) => candidate.event === "viewer_live_solve_failed"
       );
       expect(failedEvent).toBeDefined();
-      expect(failedEvent!.fields.endpoint).toBe("http://127.0.0.1:8765/solve");
+      expect(failedEvent!.fields.endpoint).toBe("http://127.0.0.1:8765/live/frame");
     });
   });
 
@@ -1476,6 +1488,173 @@ describe("App live solve failure observability", () => {
       );
       expect(failedEvent).toBeDefined();
       expect(failedEvent!.fields.mission_position_source).toBe("local_fallback");
+    });
+  });
+});
+
+describe("App backend live-frame path", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function backendLiveFrameBody(): Record<string, unknown> {
+    return {
+      schema_version: "0.1.0",
+      metadata: {
+        solver: "c-uwb-gnss",
+        formation: "grid",
+        motion: "random_walk",
+        time_s: 0,
+        selected_uwb_count: 1
+      },
+      truth: [
+        { agent_id: "agent_0", position_m: [0, 0, 0] },
+        { agent_id: "agent_1", position_m: [2, 0, 0] }
+      ],
+      measurements: {
+        gnss: [
+          { agent_id: "agent_0", position_m: [0.2, 0, 0], sigma_m: 1 },
+          { agent_id: "agent_1", position_m: [2.2, 0, 0], sigma_m: 1 }
+        ],
+        uwb: [
+          { source_id: "agent_0", target_id: "agent_1", distance_m: 2, sigma_m: 0.1 }
+        ]
+      },
+      selected_uwb_links: [{
+        source_id: "agent_0",
+        target_id: "agent_1",
+        measured_distance_m: 2,
+        sigma_m: 0.1,
+        selection_reason: "new"
+      }],
+      uwb_selection: {
+        candidate_link_count: 1,
+        selected_link_count: 1,
+        max_links_per_agent: 3,
+        connected_component_count: 1,
+        isolated_agent_count: 0,
+        triangle_count: 0,
+        added_links: 1,
+        dropped_links: 0,
+        selection_policy: "adaptive_range_graph_v1",
+        adaptive_selection_enabled: true
+      },
+      estimates: {
+        fused: [{ agent_id: "agent_0", position_m: [0.1, 0, 0] }],
+        gnss_only: [{ agent_id: "agent_0", position_m: [0.2, 0, 0] }]
+      },
+      trace: {
+        trace_type: "live_solve",
+        iterations: [{
+          iteration: 0,
+          positions: { agent_0: [0.1, 0, 0] },
+          cost_total: 1,
+          cost_gnss: 0.5,
+          cost_uwb: 0.5,
+          gnss_residuals: [],
+          uwb_residuals: []
+        }]
+      },
+      constraints: { nodes: [], edges: [] },
+      quality: null
+    };
+  }
+
+  it("requests /live/frame with mission intent and never assembles a /solve request", async () => {
+    const frameRequests: Record<string, unknown>[] = [];
+    let solveCalled = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: unknown, init?: { body?: unknown }) => {
+      const url = String(input);
+      if (url.endsWith("/solve")) {
+        solveCalled = true;
+      }
+      if (url.includes("/live/frame") && init?.body) {
+        frameRequests.push(JSON.parse(String(init.body)));
+        return {
+          ok: true,
+          status: 200,
+          text: async () => "",
+          json: async () => backendLiveFrameBody()
+        };
+      }
+      if (url.includes("/observability/") || url.includes("/mission-actions/")) {
+        return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
+      }
+      throw new Error("NetworkError when attempting to fetch resource.");
+    }));
+
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+    app.mount(sceneTrace);
+
+    await vi.waitFor(() => {
+      expect(frameRequests.length).toBeGreaterThan(0);
+    });
+    const frameRequest = frameRequests[0];
+    expect(frameRequest).toHaveProperty("agent_ids");
+    expect(frameRequest).toHaveProperty("mission_action");
+    expect(frameRequest).toHaveProperty("max_uwb_links_per_agent");
+    expect(frameRequest).not.toHaveProperty("agents");
+    expect(frameRequest).not.toHaveProperty("gnss");
+    expect(frameRequest).not.toHaveProperty("uwb");
+    expect(solveCalled).toBe(false);
+  });
+
+  it("echoes backend-selected UWB links as the next request's previous links", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: unknown) => {
+      const url = String(input);
+      if (url.includes("/live/frame")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => "",
+          json: async () => backendLiveFrameBody()
+        };
+      }
+      if (url.includes("/observability/") || url.includes("/mission-actions/")) {
+        return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
+      }
+      throw new Error("NetworkError when attempting to fetch resource.");
+    }));
+
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+    app.mount(sceneTrace);
+
+    await vi.waitFor(() => {
+      const previousLinks = (app as unknown as {
+        previousSelectedUwbLinks: Array<{ sourceId: string; targetId: string }>;
+      }).previousSelectedUwbLinks;
+      expect(previousLinks).toEqual([
+        expect.objectContaining({ sourceId: "agent_0", targetId: "agent_1" })
+      ]);
+    });
+  });
+
+  it("marks explicit backend fallback when live frames are unavailable", async () => {
+    const flushedEvents: Array<{ event: string; fields: Record<string, unknown> }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: unknown, init?: { body?: unknown }) => {
+      const url = String(input);
+      if (url.includes("/observability/")) {
+        if (url.includes("/observability/events") && init?.body) {
+          flushedEvents.push(...JSON.parse(String(init.body)));
+        }
+        return { ok: true, status: 200, text: async () => "", json: async () => ({}) };
+      }
+      throw new Error("NetworkError when attempting to fetch resource.");
+    }));
+
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+    app.mount(sceneTrace);
+
+    await vi.waitFor(() => {
+      const failedEvent = flushedEvents.find(
+        (candidate) => candidate.event === "viewer_live_solve_failed"
+      );
+      expect(failedEvent).toBeDefined();
+      expect(failedEvent!.fields.endpoint).toBe("http://127.0.0.1:8765/live/frame");
+      expect(failedEvent!.fields.live_frame_source).toBe("local_fallback");
     });
   });
 });

@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SceneTrace } from "../data/sceneTypes";
-import {
-  buildLiveEstimationFrame,
-  solveLiveFusion
-} from "./liveEstimation";
+import { buildLiveEstimationFrame } from "./liveEstimation";
 import { defaultMissionActionState } from "./missionActions";
 import { fallbackMissionActionPositions } from "./missionActionFallback";
 
@@ -278,17 +275,6 @@ describe("live estimation frame", () => {
     );
 
     expect(distanceDelta).toBeGreaterThan(0.005);
-  });
-
-  it("recalculates fused positions from live GNSS and selected UWB links", () => {
-    const sparseFrame = buildLiveEstimationFrame(sceneTrace, 1.0, 1, 0.3);
-    const denseFrame = buildLiveEstimationFrame(sceneTrace, 1.0, 3, 0.3);
-    const sparseFused = solveLiveFusion(sparseFrame).get("agent_1");
-    const denseFused = solveLiveFusion(denseFrame).get("agent_1");
-
-    expect(sparseFused).toBeDefined();
-    expect(denseFused).toBeDefined();
-    expect(denseFused).not.toEqual(sparseFused);
   });
 
   it("carries adaptive UWB selection diagnostics on the live frame", () => {

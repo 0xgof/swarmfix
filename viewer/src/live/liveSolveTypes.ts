@@ -1,5 +1,4 @@
 import type { SceneTrace } from "../data/sceneTypes";
-import type { LiveEstimationFrame } from "../simulation/liveEstimation";
 
 export type LiveRobustLoss = "linear" | "soft_l1" | "huber" | "cauchy" | "arctan";
 export type UwbConstraintState = "no_uwb" | "weak_uwb" | "multi_uwb";
@@ -140,46 +139,6 @@ export interface LiveSolveResponse {
     nodes: LiveConstraintNode[];
     edges: LiveConstraintEdge[];
   };
-}
-
-export function buildLiveSolveRequest(sceneTrace: SceneTrace,
-                                      liveFrame: LiveEstimationFrame,
-                                      _maxUwbLinksPerAgent: number): LiveSolveRequest {
-  const agents = Array.from(liveFrame.truthPositions.entries()).map(
-    ([agentId, position]) => ({ agent_id: agentId, position_m: position })
-  );
-  const gnss = Array.from(liveFrame.gnssPositions.entries()).map(
-    ([agentId, position]) => ({
-      agent_id: agentId,
-      position_m: position,
-      sigma_m: liveFrame.gnssSigma.get(agentId) ?? 1
-    })
-  );
-  const selectedLinks = liveFrame.uwbLinks;
-  const uwb = selectedLinks.map((link) => ({
-    source_id: link.sourceId,
-    target_id: link.targetId,
-    distance_m: link.measuredDistanceM,
-    sigma_m: link.sigmaM,
-    true_distance_m: null
-  }));
-  const selected_uwb_links = selectedLinks.map((link) => ({
-    source_id: link.sourceId,
-    target_id: link.targetId
-  }));
-  const request = {
-    schema_version: sceneTrace.schema_version,
-    dimension: 3,
-    agents,
-    gnss,
-    uwb,
-    selected_uwb_links,
-    estimation: {
-      max_iterations: 40,
-      robust_loss: "linear" as LiveRobustLoss
-    }
-  };
-  return request;
 }
 
 function exportedConstraintState(degree: number): UwbConstraintState {

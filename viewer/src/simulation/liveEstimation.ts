@@ -1,3 +1,15 @@
+/**
+ * FALLBACK-ONLY local live-frame construction.
+ *
+ * After the BLF backend live-frame migration, the normal viewer path renders
+ * from backend `POST /live/frame` responses. This module builds a local
+ * live frame (truth, GNSS, UWB candidates, and UWB selection) only for the
+ * explicit disconnected/demo fallback reached through
+ * `App.buildFallbackLiveFrame(...)`, which sets `live_frame_source` to
+ * `local_fallback` in observability. Do not wire this into the normal solver
+ * input path; backend live frames are authoritative.
+ */
+
 import {
   animatedSwarmPosition,
   liftPositionTo3D,
@@ -262,53 +274,4 @@ export function buildLiveEstimationFrame(sceneTrace: SceneTrace,
     uwbSelection: selection.diagnostics
   };
   return liveFrame;
-}
-
-export function solveLiveFusion(frame: LiveEstimationFrame): Map<string, Position3D> {
-  const fusedPositions = new Map<string, Position3D>();
-  for (const [agentId, gnssPosition] of frame.gnssPositions.entries()) {
-    fusedPositions.set(agentId, [...gnssPosition]);
-  }
-
-  for (let iteration = 0; iteration < 12; iteration += 1) {
-    for (const link of frame.uwbLinks) {
-      const sourcePosition = fusedPositions.get(link.sourceId);
-      const targetPosition = fusedPositions.get(link.targetId);
-      if (!sourcePosition || !targetPosition) {
-        continue;
-      }
-
-      const dx = targetPosition[0] - sourcePosition[0];
-      const dy = targetPosition[1] - sourcePosition[1];
-      const dz = targetPosition[2] - sourcePosition[2];
-      const currentDistance = Math.max(Math.hypot(dx, dy, dz), 1e-9);
-      const residual = currentDistance - link.measuredDistanceM;
-      const correctionScale = residual * 0.18 / currentDistance;
-      const correction: Position3D = [
-        dx * correctionScale,
-        dy * correctionScale,
-        dz * correctionScale
-      ];
-
-      sourcePosition[0] += correction[0];
-      sourcePosition[1] += correction[1];
-      sourcePosition[2] += correction[2];
-      targetPosition[0] -= correction[0];
-      targetPosition[1] -= correction[1];
-      targetPosition[2] -= correction[2];
-    }
-
-    for (const [agentId, gnssPosition] of frame.gnssPositions.entries()) {
-      const fusedPosition = fusedPositions.get(agentId);
-      if (!fusedPosition) {
-        continue;
-      }
-
-      fusedPosition[0] += (gnssPosition[0] - fusedPosition[0]) * 0.08;
-      fusedPosition[1] += (gnssPosition[1] - fusedPosition[1]) * 0.08;
-      fusedPosition[2] += (gnssPosition[2] - fusedPosition[2]) * 0.08;
-    }
-  }
-
-  return fusedPositions;
 }

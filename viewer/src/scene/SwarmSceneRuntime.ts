@@ -24,10 +24,7 @@ import {
   buildUwbCordPoints,
   createUwbLink
 } from "../renderers/UwbLinkRenderer";
-import {
-  buildLiveEstimationFrame,
-  type LiveEstimationFrame
-} from "../simulation/liveEstimation";
+import type { LiveEstimationFrame } from "../simulation/liveEstimation";
 import type { MissionActionState } from "../simulation/missionActions";
 import { layerStyles, type MarkerStyle } from "../style/layerStyles";
 import { createViewerMaterials } from "../style/createMaterials";
@@ -45,7 +42,7 @@ export interface SwarmSceneFrame {
   motionAmplitudeM: number;
   displayFrame: LiveSolveResponse | null;
   missionAction: MissionActionState | null;
-  liveFrame: LiveEstimationFrame | null;
+  liveFrame: LiveEstimationFrame;
 }
 
 type MarkerLayerKey = "truth" | "gnss" | "gnssOnly" | "fused" | "corrected" | "references";
@@ -141,13 +138,7 @@ export class SwarmSceneRuntime {
   }
 
   updateFrame(frame: SwarmSceneFrame): void {
-    const liveFrame = frame.liveFrame ?? buildLiveEstimationFrame(
-      frame.sceneTrace,
-      frame.timeSeconds,
-      frame.maxUwbLinksPerAgent,
-      frame.motionAmplitudeM,
-      frame.missionAction
-    );
+    const liveFrame = frame.liveFrame;
     const fusedPositions = fusedPositionMap(frame.displayFrame);
     const gnssOnlyPositions = gnssOnlyPositionMap(frame.displayFrame);
     const traceIteration = latestTraceIteration(frame.displayFrame);

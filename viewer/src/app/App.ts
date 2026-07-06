@@ -6,7 +6,6 @@ import type { SceneTrace } from "../data/sceneTypes";
 import type { Position3D } from "../animation/liveMotion";
 import {
   buildInitialLiveSolveResponse,
-  buildLiveSolveRequest,
   type LiveSolveRequest,
   type LiveSolveResponse
 } from "../live/liveSolveTypes";
@@ -15,7 +14,17 @@ import {
   type MissionActionCatalog
 } from "../live/missionActionCatalogClient";
 import { requestMissionActionPositions } from "../live/missionActionPositionsClient";
-import { defaultLiveSolveEndpoint, requestLiveSolve } from "../live/liveSolverClient";
+import { defaultLiveFrameEndpoint, requestLiveFrame } from "../live/liveFrameClient";
+import {
+  buildLiveFrameRequest,
+  liveEstimationFrameFromLiveFrame,
+  liveSolveRequestFromLiveFrame,
+  liveSolveResponseFromLiveFrame,
+  selectedLiveUwbLinksFromFrame,
+  uwbSelectionDiagnosticsFromFrame,
+  type LiveFrameRequest,
+  type LiveFrameResponse
+} from "../live/liveFrameTypes";
 import { LiveSolveScheduler } from "../live/liveSolveScheduler";
 import {
   defaultLiveSolverHealthEndpoint,
@@ -50,14 +59,10 @@ import {
   type LayerVisibility,
   type ViewerState
 } from "./ViewerState";
-import {
-  buildIterationControlModel,
-  buildLayerControlItems
-} from "./layerControlModel";
+import { buildLayerControlItems } from "./layerControlModel";
 import { buildEdgeInspectorModel } from "../ui/EdgeDetailsPanel";
 import { createLayerControls } from "../ui/LayerControls";
 import { buildNodeInspectorModel } from "../ui/NodeDetailsPanel";
-import { createIterationSlider } from "../ui/IterationSlider";
 import {
   createLinkCountControl,
   updateLinkCountDiagnostics
@@ -122,7 +127,7 @@ export class App {
   private scene: Scene | null;
   private sceneRuntime: SwarmSceneRuntime | null;
   private startedAtMs: number;
-  private liveSolveScheduler: LiveSolveScheduler;
+  private liveSolveScheduler: LiveSolveScheduler<LiveFrameRequest>;
   private observabilitySession: ViewerObservabilitySession;
   private performanceMonitor: PerformanceMonitor;
   private eventBuffer: BrowserEventBuffer;
@@ -141,7 +146,8 @@ export class App {
   private missionPositionRequestInFlight: boolean;
   private pendingMissionPositionRequestAtS: number | null;
   private lastMissionPositionRequestAtS: number | null;
-  private latestLiveSolveRequest: LiveSolveRequest | null;
+  private latestLiveFrameResponse: LiveFrameResponse | null;
+  private liveFrameSource: MissionPositionSource;
   private lastObservabilityFlushAtMs: number;
   private lastRenderedConnectionKey: string | null;
   private diagnosticHistory: DiagnosticHistory;
@@ -163,7 +169,10 @@ export class App {
     this.scene = null;
     this.sceneRuntime = null;
     this.startedAtMs = performance.now();
-    this.liveSolveScheduler = new LiveSolveScheduler(requestLiveSolve, 250);
+    this.liveSolveScheduler = new LiveSolveScheduler<LiveFrameRequest>(
+      (request) => this.requestLiveFrameWithObservability(request),
+      250
+    );
     this.observabilitySession = createViewerSession({
       component: "viewer",
       mode: "normal"
@@ -190,7 +199,8 @@ export class App {
     this.missionPositionRequestInFlight = false;
     this.pendingMissionPositionRequestAtS = null;
     this.lastMissionPositionRequestAtS = null;
-    this.latestLiveSolveRequest = null;
+    this.latestLiveFrameResponse = null;
+    this.liveFrameSource = "local_fallback";
     this.lastObservabilityFlushAtMs = performance.now();
     this.lastRenderedConnectionKey = null;
     this.diagnosticHistory = new DiagnosticHistory();
@@ -243,23 +253,19 @@ export class App {
     this.missionPositionRequestInFlight = false;
     this.pendingMissionPositionRequestAtS = null;
     this.lastMissionPositionRequestAtS = null;
+    this.latestLiveFrameResponse = null;
+    this.liveFrameSource = "local_fallback";
     this.lastObservabilityFlushAtMs = performance.now();
     this.lastRenderedConnectionKey = null;
     this.diagnosticHistory.cleanup();
     this.diagnosticsTimelinePanel = null;
     this.diagnosticsPlotBand = null;
     this.latestDiagnosticSample = null;
-    const initialLiveFrame = buildLiveEstimationFrame(
-      sceneTrace,
-      0,
-      this.viewerState.maxUwbLinksPerAgent,
-      this.viewerState.motionAmplitudeM,
-      this.viewerState.missionAction
-    );
-    this.previousSelectedUwbLinks = initialLiveFrame.uwbLinks;
-    this.latestUwbSelection = initialLiveFrame.uwbSelection;
-    this.liveSolveScheduler = new LiveSolveScheduler(
-      (request) => this.requestLiveSolveWithObservability(request),
+    const initialFallbackFrame = this.buildFallbackLiveFrame(0, null);
+    this.previousSelectedUwbLinks = initialFallbackFrame.uwbLinks;
+    this.latestUwbSelection = initialFallbackFrame.uwbSelection;
+    this.liveSolveScheduler = new LiveSolveScheduler<LiveFrameRequest>(
+      (request) => this.requestLiveFrameWithObservability(request),
       250,
       buildInitialLiveSolveResponse(sceneTrace),
       {
@@ -297,17 +303,6 @@ export class App {
       layers: this.layerControlItems(),
       onChange: (key, visible) => {
         this.viewerState!.setLayerVisible(key as keyof LayerVisibility, visible);
-        this.refreshScene();
-      }
-    }));
-    panel.append(createIterationSlider({
-      ...buildIterationControlModel(
-        this.viewerState.sceneTrace,
-        this.viewerState.selectedIteration,
-        true
-      ),
-      onChange: (iteration) => {
-        this.viewerState!.setIteration(iteration);
         this.refreshScene();
       }
     }));
@@ -637,6 +632,8 @@ export class App {
     this.missionPositionRequestInFlight = false;
     this.pendingMissionPositionRequestAtS = null;
     this.lastMissionPositionRequestAtS = null;
+    this.latestLiveFrameResponse = null;
+    this.liveFrameSource = "local_fallback";
     this.lastObservabilityFlushAtMs = performance.now();
     this.lastRenderedConnectionKey = null;
   }
@@ -659,11 +656,7 @@ export class App {
   }
 
   private queueLiveSolve(timeSeconds: number,
-                         recordPhase: FramePhaseRecorder | null = null): LiveEstimationFrame | null {
-    if (!this.viewerState) {
-      return null;
-    }
-
+                         recordPhase: FramePhaseRecorder | null = null): LiveEstimationFrame {
     const timePhase = <T>(name: string, operation: () => T): T => {
       const phaseStartMs = performance.now();
       const phaseResult = operation();
@@ -675,46 +668,88 @@ export class App {
       const positions = this.missionPositionsForLiveFrame(timeSeconds);
       return positions;
     });
-    const liveFrame = timePhase("live_frame_build", () => buildLiveEstimationFrame(
-        this.viewerState!.sceneTrace,
-        timeSeconds,
-        this.viewerState!.maxUwbLinksPerAgent,
-        this.viewerState!.motionAmplitudeM,
-        this.viewerState!.missionAction,
-        {},
-        this.previousSelectedUwbLinks,
-        missionPositions
-      )
-    );
-    this.previousSelectedUwbLinks = liveFrame.uwbLinks;
-    this.latestUwbSelection = liveFrame.uwbSelection;
+    const liveFrame = timePhase("live_frame_render", () => (
+      this.renderFrameForDisplay(timeSeconds, missionPositions)
+    ));
     if (this.linkCountControl) {
       updateLinkCountDiagnostics(this.linkCountControl, this.linkCountDiagnostics());
     }
     timePhase("live_solve_scheduler", () => {
       void this.liveSolveScheduler.tick(performance.now(), () => {
-        const request = buildLiveSolveRequest(
-          this.viewerState!.sceneTrace,
-          liveFrame,
-          this.viewerState!.maxUwbLinksPerAgent
-        );
-        request.trace_context = {
-          session_id: this.observabilitySession.sessionId,
-          trace_id: this.observabilitySession.traceId,
-          span_id: `viewer-live-solve-${Math.round(timeSeconds * 1000)}`,
-          correlation_id: (
-            `${this.viewerState!.sceneTrace.metadata.scenario}`
-            + `-links_per_drone_${this.viewerState!.maxUwbLinksPerAgent}`
-          ),
-          request_id: `solve-${Math.round(performance.now())}`,
-          scenario: this.viewerState!.sceneTrace.metadata.scenario
-        };
-        this.latestLiveSolveRequest = request;
-        this.publishNewtonState(timeSeconds, request);
+        const request = this.buildLiveFrameRequestForTick(timeSeconds);
+        this.publishNewtonState(timeSeconds);
         return request;
       });
     });
     return liveFrame;
+  }
+
+  private buildLiveFrameRequestForTick(timeSeconds: number): LiveFrameRequest {
+    const request = buildLiveFrameRequest({
+      sceneTrace: this.viewerState!.sceneTrace,
+      agentIds: this.activeMissionAgentIds(),
+      timeSeconds,
+      missionAction: this.viewerState!.missionAction,
+      maxUwbLinksPerAgent: this.viewerState!.maxUwbLinksPerAgent,
+      previousSelectedLinks: this.previousSelectedUwbLinks.map((link) => ({
+        sourceId: link.sourceId,
+        targetId: link.targetId
+      })),
+      previousEstimate: this.latestLiveFrameResponse?.estimates.fused.map((estimate) => ({
+        agent_id: estimate.agent_id,
+        position_m: estimate.position_m
+      })) ?? []
+    });
+    request.trace_context = {
+      session_id: this.observabilitySession.sessionId,
+      trace_id: this.observabilitySession.traceId,
+      span_id: `viewer-live-frame-${Math.round(timeSeconds * 1000)}`,
+      correlation_id: (
+        `${this.viewerState!.sceneTrace.metadata.scenario}`
+        + `-links_per_drone_${this.viewerState!.maxUwbLinksPerAgent}`
+      ),
+      request_id: `frame-${Math.round(performance.now())}`,
+      scenario: this.viewerState!.sceneTrace.metadata.scenario
+    };
+    return request;
+  }
+
+  private renderFrameForDisplay(timeSeconds: number,
+                                displayPositions: Map<string, Position3D>): LiveEstimationFrame {
+    if (this.latestLiveFrameResponse) {
+      this.liveFrameSource = "backend";
+      const backendFrame = liveEstimationFrameFromLiveFrame(
+        this.latestLiveFrameResponse,
+        displayPositions
+      );
+      return backendFrame;
+    }
+
+    const fallbackFrame = this.buildFallbackLiveFrame(timeSeconds, displayPositions);
+    this.previousSelectedUwbLinks = fallbackFrame.uwbLinks;
+    this.latestUwbSelection = fallbackFrame.uwbSelection;
+    return fallbackFrame;
+  }
+
+  // Explicit disconnected/demo fallback: the only sanctioned normal-runtime
+  // use of the local live-frame builder. Backend `/live/frame` responses are
+  // authoritative; this path only runs before the first backend frame arrives
+  // or while the backend is unavailable, and it flags `local_fallback` in
+  // observability so the fallback is never confused with backend data.
+  private buildFallbackLiveFrame(timeSeconds: number,
+                                 displayPositions: Map<string, Position3D> | null): LiveEstimationFrame {
+    this.liveFrameSource = "local_fallback";
+    const fallbackFrame = buildLiveEstimationFrame(
+      this.viewerState!.sceneTrace,
+      timeSeconds,
+      this.viewerState!.maxUwbLinksPerAgent,
+      this.viewerState!.motionAmplitudeM,
+      this.viewerState!.missionAction,
+      {},
+      this.previousSelectedUwbLinks,
+      displayPositions
+    );
+    return fallbackFrame;
   }
 
   private appendDiagnosticSample(timeSeconds: number,
@@ -817,14 +852,17 @@ export class App {
     );
   }
 
-  private publishNewtonState(timeSeconds: number,
-                             request: LiveSolveRequest | null = this.latestLiveSolveRequest): void {
+  private publishNewtonState(timeSeconds: number): void {
     if (!this.viewerState) {
       return;
     }
     if (!this.newtonDiagnosticsActive()) {
       return;
     }
+    const frame = this.latestLiveFrameResponse;
+    const request: LiveSolveRequest | null = frame
+      ? liveSolveRequestFromLiveFrame(frame)
+      : null;
     const latestResponse = this.liveSolveScheduler.getLatestSolvedFrame();
     publishNewtonSharedState({
       schemaVersion: this.viewerState.sceneTrace.schema_version,
@@ -1060,26 +1098,31 @@ export class App {
     return this.cameraFollowDistanceM;
   }
 
-  private async requestLiveSolveWithObservability(request: Parameters<typeof requestLiveSolve>[0]) {
+  private async requestLiveFrameWithObservability(request: LiveFrameRequest): Promise<LiveSolveResponse> {
     const startedAtMs = performance.now();
-    const spanId = request.trace_context?.span_id ?? `viewer-live-solve-${Math.round(startedAtMs)}`;
+    const spanId = request.trace_context?.span_id ?? `viewer-live-frame-${Math.round(startedAtMs)}`;
     this.recordViewerEvent("viewer_live_solve_request_started", spanId, {
-      selected_uwb_links: request.selected_uwb_links.length,
-      endpoint: defaultLiveSolveEndpoint,
+      selected_uwb_links: request.selection_options.previous_selected_links.length,
+      endpoint: defaultLiveFrameEndpoint,
       ...this.uwbSelectionFields(),
       ...this.actionContextFields()
     });
     this.flushObservability();
 
     try {
-      const response = await requestLiveSolve(request);
+      const frame = await requestLiveFrame(request);
       const durationMs = performance.now() - startedAtMs;
+      this.latestLiveFrameResponse = frame;
+      this.liveFrameSource = "backend";
+      this.previousSelectedUwbLinks = selectedLiveUwbLinksFromFrame(frame);
+      this.latestUwbSelection = uwbSelectionDiagnosticsFromFrame(frame);
+      const response = liveSolveResponseFromLiveFrame(frame);
       this.connectionState = updateConnectionState(this.connectionState, {
         ok: true,
         nowMs: performance.now()
       });
       this.performanceMonitor.recordLiveSolve(spanId, durationMs, {
-        selected_uwb_links: request.selected_uwb_links.length,
+        selected_uwb_links: frame.uwb_selection.selected_link_count,
         ...this.uwbSelectionFields(),
         ...this.actionContextFields()
       });
@@ -1098,13 +1141,14 @@ export class App {
       return response;
     } catch (error) {
       const durationMs = performance.now() - startedAtMs;
+      this.liveFrameSource = "local_fallback";
       this.connectionState = updateConnectionState(this.connectionState, {
         ok: false,
         nowMs: performance.now(),
         error: error instanceof Error ? error.message : String(error)
       });
       this.performanceMonitor.recordLiveSolve(spanId, durationMs, {
-        selected_uwb_links: request.selected_uwb_links.length,
+        selected_uwb_links: request.selection_options.previous_selected_links.length,
         failed: true,
         ...this.uwbSelectionFields(),
         ...this.actionContextFields()
@@ -1114,7 +1158,7 @@ export class App {
         spanId,
         {
           error: error instanceof Error ? error.message : String(error),
-          endpoint: defaultLiveSolveEndpoint,
+          endpoint: defaultLiveFrameEndpoint,
           ...this.uwbSelectionFields(),
           ...this.actionContextFields()
         },
@@ -1244,6 +1288,7 @@ export class App {
       speed_mps: action.speedMps,
       random_walk_amplitude_m: action.randomWalkAmplitudeM,
       mission_position_source: this.missionPositionSource,
+      live_frame_source: this.liveFrameSource,
       mission_drone_count: this.viewerState?.missionDroneCount ?? 0,
       max_uwb_links_per_agent: this.viewerState?.maxUwbLinksPerAgent ?? 0
     };
