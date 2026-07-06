@@ -17,7 +17,7 @@ describe("createGnssGroundUncertainty", () => {
     const ringMeshes = ringMeshesForSigma(1);
 
     expect(uncertainty).toBeInstanceOf(Group);
-    expect(ringMeshes.length).toBeGreaterThan(3);
+    expect(ringMeshes.length).toBeGreaterThan(24);
     for (const ring of ringMeshes) {
       const ringSize = new Box3().setFromObject(ring).getSize(new Vector3());
       expect(ringSize.y).toBeLessThan(0.01);
@@ -26,16 +26,17 @@ describe("createGnssGroundUncertainty", () => {
     }
   });
 
-  it("fades filled rings from a dark center toward the one sigma edge", () => {
+  it("softens filled ring edges from a dark center toward the one sigma edge", () => {
     const ringMeshes = ringMeshesForSigma(1);
     const opacities = ringMeshes.map((ring) => (
       (ring.material as MeshBasicMaterial).opacity
     ));
 
     expect(opacities[0]).toBeLessThanOrEqual(0.24);
-    expect(opacities[opacities.length - 1]).toBeLessThanOrEqual(0.06);
+    expect(opacities[opacities.length - 1]).toBeLessThanOrEqual(0.04);
     for (let index = 1; index < opacities.length; index += 1) {
       expect(opacities[index]).toBeLessThan(opacities[index - 1]);
+      expect(opacities[index - 1] - opacities[index]).toBeLessThan(0.01);
     }
   });
 
