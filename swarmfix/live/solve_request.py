@@ -11,9 +11,11 @@ from swarmfix.live.models import (
     LiveConstraintEdge,
     LiveConstraintNode,
     LiveConstraintSection,
+    LiveErrorSummary,
     LiveEstimateSection,
     LivePositionEstimate,
     LiveSolveMetadata,
+    LiveSolveQualitySummary,
     LiveSolveRequest,
     LiveSolveResponse,
     LiveTraceIteration,
@@ -272,6 +274,105 @@ def _position_estimates(estimates: list) -> list[LivePositionEstimate]:
     return live_estimates
 
 
+def _distance_between(first_position: tuple[float, ...],
+                      second_position: tuple[float, ...]) -> float:
+    """Return Euclidean distance between positions, padding short vectors."""
+    dimension = max(len(first_position), len(second_position))
+    squared_distance = 0.0
+    for index in range(dimension):
+        delta = (
+            (first_position[index] if index < len(first_position) else 0.0)
+            - (second_position[index] if index < len(second_position) else 0.0)
+        )
+        squared_distance += delta * delta
+
+    distance_m = squared_distance ** 0.5
+    return distance_m
+
+
+def _error_summary(truth_positions: dict[str, tuple[float, ...]],
+                   comparison_positions: dict[str, tuple[float, ...]]) -> LiveErrorSummary | None:
+    """Summarize position error for matched agents."""
+    errors = []
+    for agent_id, truth_position in truth_positions.items():
+        comparison_position = comparison_positions.get(agent_id)
+        if comparison_position is None:
+            continue
+        errors.append(_distance_between(truth_position, comparison_position))
+
+    if not errors:
+        return None
+
+    squared_error_sum = sum(error_m ** 2 for error_m in errors)
+    error_sum = sum(errors)
+    summary = LiveErrorSummary(
+        rmse_m=(squared_error_sum / len(errors)) ** 0.5,
+        mean_error_m=error_sum / len(errors),
+        max_error_m=max(errors),
+    )
+    return summary
+
+
+def _quality_summary(request: LiveSolveRequest,
+                     estimates: LiveEstimateSection,
+                     trace: SolverTrace) -> LiveSolveQualitySummary:
+    """Build compact solve-quality metrics for the exact request snapshot."""
+    truth_positions = {
+        agent.agent_id: agent.position_m
+        for agent in request.agents
+    }
+    fused_positions = {
+        estimate.agent_id: estimate.position_m
+        for estimate in estimates.fused
+    }
+    gnss_positions = {
+        measurement.agent_id: measurement.position_m
+        for measurement in request.gnss
+    }
+    solve_error = _error_summary(truth_positions, fused_positions)
+    gnss_truth_error = _error_summary(truth_positions, gnss_positions)
+    if solve_error is None or gnss_truth_error is None:
+        raise ValueError("live solve quality requires matched truth, fused, and GNSS positions")
+
+    solve_improvement_rmse_m = gnss_truth_error.rmse_m - solve_error.rmse_m
+    solve_error_ratio_to_gnss = (
+        solve_error.rmse_m / gnss_truth_error.rmse_m
+        if gnss_truth_error.rmse_m > 0.0
+        else None
+    )
+    final_iteration = trace.iterations[-1] if trace.iterations else None
+    quality = LiveSolveQualitySummary(
+        solve_error=solve_error,
+        gnss_truth_error=gnss_truth_error,
+        solve_improvement_rmse_m=solve_improvement_rmse_m,
+        solve_error_ratio_to_gnss=solve_error_ratio_to_gnss,
+        fused_worse_than_gnss=solve_error.rmse_m > gnss_truth_error.rmse_m,
+        final_cost_total=final_iteration.cost_total if final_iteration else None,
+        final_cost_gnss=final_iteration.cost_gnss if final_iteration else None,
+        final_cost_uwb=final_iteration.cost_uwb if final_iteration else None,
+    )
+    return quality
+
+
+def _quality_event_fields(quality: LiveSolveQualitySummary) -> dict[str, object]:
+    """Flatten solve-quality metrics for trace event fields."""
+    fields = {
+        "solve_error_rmse_m": quality.solve_error.rmse_m,
+        "solve_error_mean_m": quality.solve_error.mean_error_m,
+        "solve_error_max_m": quality.solve_error.max_error_m,
+        "gnss_truth_error_rmse_m": quality.gnss_truth_error.rmse_m,
+        "gnss_truth_error_mean_m": quality.gnss_truth_error.mean_error_m,
+        "gnss_truth_error_max_m": quality.gnss_truth_error.max_error_m,
+        "solve_improvement_rmse_m": quality.solve_improvement_rmse_m,
+        "solve_error_ratio_to_gnss": quality.solve_error_ratio_to_gnss,
+        "fused_worse_than_gnss": quality.fused_worse_than_gnss,
+        "final_cost_total": quality.final_cost_total,
+        "final_cost_gnss": quality.final_cost_gnss,
+        "final_cost_uwb": quality.final_cost_uwb,
+    }
+    return fields
+
+
 def _trace_section(trace: SolverTrace) -> LiveTraceSection:
     """Convert solver trace records into serializable live trace models."""
     iterations = []
@@ -353,6 +454,7 @@ def solve_live_request(request: LiveSolveRequest,
             fused=_position_estimates(fused_estimates.estimates),
             gnss_only=_position_estimates(gnss_only_estimates.estimates),
         )
+        quality = _quality_summary(request, estimates, solver_trace)
         constraints = _build_constraints(request, measurements, solver_trace)
         duration_ms = (perf_counter() - started_seconds) * 1000.0
         _emit_event(
@@ -363,6 +465,10 @@ def solve_live_request(request: LiveSolveRequest,
                 "solver_backend": solver_backend_name,
                 "trace_iterations": len(solver_trace.iterations),
                 "selected_uwb_count": len(measurements.uwb),
+                "agent_count": len(request.agents),
+                "robust_loss": request.estimation.robust_loss,
+                "max_iterations": request.estimation.max_iterations,
+                **_quality_event_fields(quality),
             },
             duration_ms=duration_ms,
         )
@@ -372,6 +478,7 @@ def solve_live_request(request: LiveSolveRequest,
                 solver=solver_backend_name,
                 selected_uwb_count=len(measurements.uwb),
                 trace_context=trace_context.model_dump(mode="json"),
+                quality=quality,
             ),
             truth=request.agents,
             measurements={

@@ -225,12 +225,34 @@ class LiveConstraintSection(BaseModel):
         raise KeyError(f"unknown constraint agent_id: {agent_id}")
 
 
+class LiveErrorSummary(BaseModel):
+    """Aggregate position-error metrics for one comparable solve snapshot."""
+
+    rmse_m: float
+    mean_error_m: float
+    max_error_m: float
+
+
+class LiveSolveQualitySummary(BaseModel):
+    """Compact solve-quality summary for observability and viewer diagnostics."""
+
+    solve_error: LiveErrorSummary
+    gnss_truth_error: LiveErrorSummary
+    solve_improvement_rmse_m: float
+    solve_error_ratio_to_gnss: float | None
+    fused_worse_than_gnss: bool
+    final_cost_total: float | None = None
+    final_cost_gnss: float | None = None
+    final_cost_uwb: float | None = None
+
+
 class LiveSolveMetadata(BaseModel):
     """Metadata describing how the live solve response was produced."""
 
     solver: str
     selected_uwb_count: int
     trace_context: dict[str, object] | None = None
+    quality: LiveSolveQualitySummary | None = None
 
 
 class LiveSolveResponse(BaseModel):

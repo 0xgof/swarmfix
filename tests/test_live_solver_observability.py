@@ -92,6 +92,34 @@ def test_live_solver_emits_traceable_success_events() -> None:
     assert response.metadata.trace_context["session_id"] == "session-live"
 
 
+def test_live_solver_records_solver_quality_against_gnss_baseline() -> None:
+    """Completed solves should say whether fusion beat GNSS for that snapshot."""
+    sink = InMemorySink()
+    request = _live_request()
+
+    response = solve_live_request(
+        request,
+        observability_sink=sink,
+        solver_backend=_python_backend(),
+    )
+
+    completed_event = sink.events[-1]
+    assert completed_event.event == "live_solve_completed"
+    assert completed_event.fields["solve_error_rmse_m"] < completed_event.fields[
+        "gnss_truth_error_rmse_m"
+    ]
+    assert completed_event.fields["solve_improvement_rmse_m"] > 0.0
+    assert completed_event.fields["solve_error_ratio_to_gnss"] < 1.0
+    assert completed_event.fields["fused_worse_than_gnss"] is False
+    assert completed_event.fields["final_cost_total"] >= 0.0
+    assert completed_event.fields["final_cost_gnss"] >= 0.0
+    assert completed_event.fields["final_cost_uwb"] >= 0.0
+    assert response.metadata.quality is not None
+    assert response.metadata.quality.solve_error.rmse_m == pytest.approx(
+        completed_event.fields["solve_error_rmse_m"]
+    )
+
+
 def test_live_solver_emits_failure_event_before_reraising_validation_error() -> None:
     trace_context = TraceContext(
         session_id="session-live",
