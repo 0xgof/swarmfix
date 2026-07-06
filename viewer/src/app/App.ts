@@ -147,6 +147,7 @@ export class App {
   private diagnosticHistory: DiagnosticHistory;
   private diagnosticsTimelinePanel: DiagnosticsTimelinePanel | null;
   private diagnosticsPlotBand: HTMLElement | null;
+  private latestDiagnosticSample: ViewerDiagnosticSample | null;
 
   constructor(root: HTMLElement,
               sceneUrl = "/examples/full_workflow_demo.json") {
@@ -195,6 +196,7 @@ export class App {
     this.diagnosticHistory = new DiagnosticHistory();
     this.diagnosticsTimelinePanel = null;
     this.diagnosticsPlotBand = null;
+    this.latestDiagnosticSample = null;
   }
 
   getCameraForTest(): ReturnType<typeof createCamera> | null {
@@ -246,6 +248,7 @@ export class App {
     this.diagnosticHistory.cleanup();
     this.diagnosticsTimelinePanel = null;
     this.diagnosticsPlotBand = null;
+    this.latestDiagnosticSample = null;
     const initialLiveFrame = buildLiveEstimationFrame(
       sceneTrace,
       0,
@@ -392,6 +395,7 @@ export class App {
 
   private resetDiagnosticsPlots(): void {
     this.diagnosticHistory.clear();
+    this.latestDiagnosticSample = null;
     this.diagnosticsTimelinePanel?.update([]);
   }
 
@@ -581,6 +585,7 @@ export class App {
           selected_uwb_links: displayFrame?.metadata.selected_uwb_count ?? 0,
           live_solve_frame_changed: liveSolveFrameChanged,
           ...this.uwbSelectionFields(),
+          ...this.qualityContextFields(),
           ...this.actionContextFields()
         },
         framePhases
@@ -754,6 +759,21 @@ export class App {
           gnssErrorMaxM: gnssError.maxErrorM
         }
         : {}),
+      ...(displayFrame.metadata.quality
+        ? {
+          solveErrorRmseM: displayFrame.metadata.quality.solve_error.rmse_m,
+          solveErrorMeanM: displayFrame.metadata.quality.solve_error.mean_error_m,
+          solveErrorMaxM: displayFrame.metadata.quality.solve_error.max_error_m,
+          solveGnssErrorRmseM: displayFrame.metadata.quality.gnss_truth_error.rmse_m,
+          solveGnssErrorMeanM: displayFrame.metadata.quality.gnss_truth_error.mean_error_m,
+          solveGnssErrorMaxM: displayFrame.metadata.quality.gnss_truth_error.max_error_m,
+          solveImprovementRmseM: displayFrame.metadata.quality.solve_improvement_rmse_m,
+          fusedWorseThanGnss: displayFrame.metadata.quality.fused_worse_than_gnss
+        }
+        : {}),
+      ...(this.liveSolveScheduler.getLatestSolvedFrameAgeMs() !== null
+        ? { responseAgeMs: this.liveSolveScheduler.getLatestSolvedFrameAgeMs() ?? undefined }
+        : {}),
       missionDroneCount: this.viewerState.missionDroneCount,
       formationMode: action.formation,
       motionMode: action.motion,
@@ -762,7 +782,39 @@ export class App {
       selectedUwbLinks: displayFrame.metadata.selected_uwb_count
     };
     this.diagnosticHistory.append(sample);
+    this.latestDiagnosticSample = sample;
     this.diagnosticsTimelinePanel?.update(this.diagnosticHistory.samples());
+    this.recordQualityDisplayedEvent(sample, displayFrame);
+  }
+
+  private recordQualityDisplayedEvent(sample: ViewerDiagnosticSample,
+                                      displayFrame: LiveSolveResponse): void {
+    this.recordViewerEvent(
+      "live_solve_quality_displayed",
+      `viewer-quality-${sample.timestampMs}`,
+      {
+        display_error_rmse_m: sample.errorRmseM,
+        display_error_mean_m: sample.errorMeanM,
+        display_error_max_m: sample.errorMaxM,
+        display_gnss_error_rmse_m: sample.gnssErrorRmseM,
+        display_gnss_error_mean_m: sample.gnssErrorMeanM,
+        display_gnss_error_max_m: sample.gnssErrorMaxM,
+        solve_error_rmse_m: sample.solveErrorRmseM,
+        solve_error_mean_m: sample.solveErrorMeanM,
+        solve_error_max_m: sample.solveErrorMaxM,
+        gnss_truth_error_rmse_m: sample.solveGnssErrorRmseM,
+        gnss_truth_error_mean_m: sample.solveGnssErrorMeanM,
+        gnss_truth_error_max_m: sample.solveGnssErrorMaxM,
+        solve_improvement_rmse_m: sample.solveImprovementRmseM,
+        fused_worse_than_gnss: sample.fusedWorseThanGnss,
+        response_age_ms: sample.responseAgeMs,
+        selected_uwb_links: displayFrame.metadata.selected_uwb_count,
+        formation_mode: sample.formationMode,
+        motion_mode: sample.motionMode,
+        speed_mps: sample.speedMps,
+        random_walk_amplitude_m: sample.randomWalkAmplitudeM
+      }
+    );
   }
 
   private publishNewtonState(timeSeconds: number,
@@ -1213,6 +1265,23 @@ export class App {
       selection_policy: selection.selectionPolicy,
       added_links: selection.addedLinks,
       dropped_links: selection.droppedLinks
+    };
+    return fields;
+  }
+
+  private qualityContextFields(): Record<string, unknown> {
+    const sample = this.latestDiagnosticSample;
+    if (!sample) {
+      return {};
+    }
+
+    const fields = {
+      response_age_ms: sample.responseAgeMs,
+      display_error_rmse_m: sample.errorRmseM,
+      display_gnss_error_rmse_m: sample.gnssErrorRmseM,
+      latest_solve_error_rmse_m: sample.solveErrorRmseM,
+      latest_gnss_truth_error_rmse_m: sample.solveGnssErrorRmseM,
+      latest_fused_worse_than_gnss: sample.fusedWorseThanGnss
     };
     return fields;
   }

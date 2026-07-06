@@ -81,6 +81,23 @@ export interface LiveTraceIteration {
   }>;
 }
 
+export interface LiveErrorSummary {
+  rmse_m: number;
+  mean_error_m: number;
+  max_error_m: number;
+}
+
+export interface LiveSolveQualitySummary {
+  solve_error: LiveErrorSummary;
+  gnss_truth_error: LiveErrorSummary;
+  solve_improvement_rmse_m: number;
+  solve_error_ratio_to_gnss?: number | null;
+  fused_worse_than_gnss: boolean;
+  final_cost_total?: number | null;
+  final_cost_gnss?: number | null;
+  final_cost_uwb?: number | null;
+}
+
 export interface LiveConstraintNode {
   agent_id: string;
   selected_uwb_degree: number;
@@ -104,6 +121,7 @@ export interface LiveSolveResponse {
     solver: string;
     selected_uwb_count: number;
     trace_context?: LiveTraceContext | null;
+    quality?: LiveSolveQualitySummary | null;
   };
   truth: LiveAgentState[];
   measurements: {

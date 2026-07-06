@@ -120,15 +120,24 @@ function pathForSeries(samples: ViewerDiagnosticSample[],
 }
 
 interface SecondaryPlotSeries {
+  className: string;
   currentText: string;
+  label: string;
   readValue: SampleValueReader;
+  strokeDasharray?: string;
+}
+
+interface PlotLegendItem {
+  className: string;
+  label: string;
 }
 
 function createPlot(title: string,
                     currentText: string,
                     samples: ViewerDiagnosticSample[],
                     readValue: SampleValueReader,
-                    secondarySeries?: SecondaryPlotSeries): HTMLElement {
+                    secondarySeries: SecondaryPlotSeries[] = [],
+                    legendItems: PlotLegendItem[] = []): HTMLElement {
   const section = document.createElement("section");
   section.className = "diagnostics-timeline-plot";
   const header = document.createElement("div");
@@ -136,9 +145,11 @@ function createPlot(title: string,
   const label = document.createElement("span");
   label.textContent = title;
   const current = document.createElement("span");
-  current.textContent = secondarySeries
-    ? `${currentText} | ${secondarySeries.currentText}`
-    : currentText;
+  const currentLabels = [
+    currentText,
+    ...secondarySeries.map((series) => series.currentText)
+  ];
+  current.textContent = currentLabels.join(" | ");
   header.append(label, current);
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", `0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`);
@@ -150,8 +161,8 @@ function createPlot(title: string,
     if (isFiniteNumber(primaryValue)) {
       values.push(primaryValue);
     }
-    if (secondarySeries) {
-      const secondaryValue = secondarySeries.readValue(sample);
+    for (const series of secondarySeries) {
+      const secondaryValue = series.readValue(sample);
       if (isFiniteNumber(secondaryValue)) {
         values.push(secondaryValue);
       }
@@ -163,20 +174,38 @@ function createPlot(title: string,
   path.setAttribute("class", "diagnostics-timeline-path");
   path.setAttribute("d", pathForSeries(samples, readValue, sharedRange));
   svg.append(path);
-  if (secondarySeries) {
+  for (const series of secondarySeries) {
     const secondaryPath = document.createElementNS(SVG_NS, "path");
     secondaryPath.setAttribute(
       "class",
-      "diagnostics-timeline-path diagnostics-timeline-path-secondary"
+      `diagnostics-timeline-path ${series.className}`
     );
+    if (series.strokeDasharray) {
+      secondaryPath.setAttribute("stroke-dasharray", series.strokeDasharray);
+    }
     secondaryPath.setAttribute("d", pathForSeries(
       samples,
-      secondarySeries.readValue,
+      series.readValue,
       sharedRange
     ));
     svg.append(secondaryPath);
   }
   section.append(header, svg);
+  if (legendItems.length > 0) {
+    const legend = document.createElement("div");
+    legend.className = "diagnostics-timeline-legend";
+    for (const item of legendItems) {
+      const legendItem = document.createElement("span");
+      legendItem.className = "diagnostics-timeline-legend-item";
+      const swatch = document.createElement("span");
+      swatch.className = `diagnostics-timeline-legend-swatch ${item.className}`;
+      const labelText = document.createElement("span");
+      labelText.textContent = item.label;
+      legendItem.append(swatch, labelText);
+      legend.append(legendItem);
+    }
+    section.append(legend);
+  }
   return section;
 }
 
@@ -228,10 +257,34 @@ export class DiagnosticsTimelinePanel {
     const latestSample = samples[samples.length - 1];
     const gnssOverlay = isFiniteNumber(latestSample.gnssErrorRmseM)
       ? {
+        className: "diagnostics-timeline-path-secondary",
         currentText: `GNSS ${formatMeters(latestSample.gnssErrorRmseM)}`,
+        label: "GNSS",
         readValue: (sample: ViewerDiagnosticSample) => sample.gnssErrorRmseM
       }
-      : undefined;
+      : null;
+    const solverOverlay = isFiniteNumber(latestSample.solveErrorRmseM)
+      ? {
+        className: "diagnostics-timeline-path-solver",
+        currentText: `solver ${formatMeters(latestSample.solveErrorRmseM)}`,
+        label: "solver snapshot",
+        readValue: (sample: ViewerDiagnosticSample) => sample.solveErrorRmseM,
+        strokeDasharray: "4 4"
+      }
+      : null;
+    const errorOverlays = [gnssOverlay, solverOverlay].filter(
+      (series): series is SecondaryPlotSeries => series !== null
+    );
+    const errorLegendItems: PlotLegendItem[] = [
+      {
+        className: "diagnostics-timeline-path",
+        label: "display"
+      },
+      ...errorOverlays.map((series) => ({
+        className: series.className,
+        label: series.label
+      }))
+    ];
     this.element.append(
       createPlot(
         "cost vs time",
@@ -240,11 +293,12 @@ export class DiagnosticsTimelinePanel {
         (sample) => sample.costTotal
       ),
       createPlot(
-        "error vs time",
+        "display tracking error",
         formatMeters(latestSample.errorRmseM),
         samples,
         (sample) => sample.errorRmseM,
-        gnssOverlay
+        errorOverlays,
+        errorLegendItems
       )
     );
   }

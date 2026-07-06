@@ -151,6 +151,14 @@ export class LiveSolveScheduler {
     return this.latestSolvedFrame;
   }
 
+  getLatestSolvedFrameAgeMs(nowMs = this.clock()): number | null {
+    if (this.latestSolvedFrameReceivedAtMs === null) {
+      return null;
+    }
+    const ageMs = Math.max(0, nowMs - this.latestSolvedFrameReceivedAtMs);
+    return ageMs;
+  }
+
   getDisplayFrame(nowMs = this.clock()): LiveSolveResponse | null {
     if (!this.latestSolvedFrame) {
       return null;

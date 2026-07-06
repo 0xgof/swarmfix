@@ -84,6 +84,7 @@ describe("live solve type helpers", () => {
     const response = buildInitialLiveSolveResponse(exportedTrace);
 
     expect(response.metadata.solver).toBe("exported-scene-trace");
+    expect(response.metadata.quality).toBeUndefined();
     expect(response.estimates.fused[0].position_m).toEqual([0.1, 0.0]);
     expect(response.trace.iterations[0].cost_total).toBe(5);
     expect(response.constraints.edges[0].measurement_type).toBe("distance_constraint");

@@ -19,6 +19,15 @@ function sample(timestampMs: number): ViewerDiagnosticSample {
     gnssErrorRmseM: timestampMs / 900,
     gnssErrorMeanM: timestampMs / 1100,
     gnssErrorMaxM: timestampMs / 700,
+    solveErrorRmseM: timestampMs / 1500,
+    solveErrorMeanM: timestampMs / 1600,
+    solveErrorMaxM: timestampMs / 1400,
+    solveGnssErrorRmseM: timestampMs / 1300,
+    solveGnssErrorMeanM: timestampMs / 1350,
+    solveGnssErrorMaxM: timestampMs / 1250,
+    solveImprovementRmseM: timestampMs / 5000,
+    fusedWorseThanGnss: false,
+    responseAgeMs: 42,
     missionDroneCount: 10,
     formationMode: "grid",
     motionMode: "random_walk",
@@ -81,6 +90,27 @@ describe("DiagnosticsTimelineHistory", () => {
     history.append(sample(61000));
 
     expect(history.samples().map((entry) => entry.timestampMs)).toEqual([30000, 61000]);
+  });
+
+  it("stores display and solver snapshot quality independently", () => {
+    const history = new DiagnosticHistory({ windowMs: 60000, maxSamples: 300 });
+
+    history.append({
+      ...sample(1000),
+      errorRmseM: 4,
+      gnssErrorRmseM: 2,
+      solveErrorRmseM: 0.4,
+      solveGnssErrorRmseM: 1.2,
+      responseAgeMs: 125
+    });
+
+    expect(history.samples()[0]).toMatchObject({
+      errorRmseM: 4,
+      gnssErrorRmseM: 2,
+      solveErrorRmseM: 0.4,
+      solveGnssErrorRmseM: 1.2,
+      responseAgeMs: 125
+    });
   });
 
   it("caps retained samples and cleans up idempotently", () => {

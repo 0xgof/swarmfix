@@ -92,6 +92,9 @@ type DiagnosticSampleAppendTestAccess = {
     liveFrame: LiveEstimationFrame | null,
     displayFrame: unknown
   ) => void;
+  eventBuffer: {
+    snapshot: () => Array<{ event: string; fields: Record<string, unknown> }>;
+  };
 };
 
 type LiveSolveSchedulerTestAccess = {
@@ -1232,6 +1235,74 @@ describe("App camera lifecycle", () => {
 
     expect(root.querySelector(".diagnostics-timeline-panel")?.textContent)
       .toContain("GNSS 5.000 m");
+  });
+
+  it("records response-cadence quality events for displayed live solves", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+    const liveFrame = liveFrameFromPositions([
+      ["agent_0", [0, 0, 0]],
+      ["agent_1", [3, 0, 0]]
+    ]);
+    liveFrame.gnssPositions = new Map<string, Position3D>([
+      ["agent_0", [0, 5, 0]],
+      ["agent_1", [3, 5, 0]]
+    ]);
+    const displayFrame = {
+      schema_version: "0.1.0",
+      metadata: {
+        solver: "test",
+        selected_uwb_count: 0,
+        quality: {
+          solve_error: { rmse_m: 0.1, mean_error_m: 0.1, max_error_m: 0.1 },
+          gnss_truth_error: { rmse_m: 5, mean_error_m: 5, max_error_m: 5 },
+          solve_improvement_rmse_m: 4.9,
+          solve_error_ratio_to_gnss: 0.02,
+          fused_worse_than_gnss: false,
+          final_cost_total: 1,
+          final_cost_gnss: 0.5,
+          final_cost_uwb: 0.5
+        }
+      },
+      truth: [],
+      measurements: { gnss: [], uwb: [] },
+      estimates: {
+        fused: [
+          { agent_id: "agent_0", position_m: [0.1, 0, 0] },
+          { agent_id: "agent_1", position_m: [3.1, 0, 0] }
+        ],
+        gnss_only: []
+      },
+      trace: {
+        trace_type: "live_solve",
+        iterations: [{
+          iteration: 0,
+          positions: {},
+          cost_total: 1,
+          cost_gnss: 0.5,
+          cost_uwb: 0.5,
+          gnss_residuals: [],
+          uwb_residuals: []
+        }]
+      },
+      constraints: { nodes: [], edges: [] }
+    };
+
+    app.mount(sceneTrace);
+    const access = app as unknown as DiagnosticSampleAppendTestAccess;
+    access.appendDiagnosticSample(1, liveFrame, displayFrame);
+
+    const qualityEvent = access.eventBuffer.snapshot().find((event) => (
+      event.event === "live_solve_quality_displayed"
+    ));
+    expect(qualityEvent?.fields.display_error_rmse_m).toBeCloseTo(0.1);
+    expect(qualityEvent?.fields).toMatchObject({
+      display_gnss_error_rmse_m: 5,
+      solve_error_rmse_m: 0.1,
+      gnss_truth_error_rmse_m: 5,
+      solve_improvement_rmse_m: 4.9,
+      fused_worse_than_gnss: false
+    });
   });
 
   it("does not publish Newton shared state during normal viewer operation", () => {

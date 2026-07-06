@@ -39,7 +39,13 @@ describe("viewer performance monitor", () => {
         formation_mode: "grid",
         motion_mode: "random_walk",
         mission_position_source: "backend",
-        live_solve_frame_changed: true
+        live_solve_frame_changed: true,
+        response_age_ms: 125,
+        display_error_rmse_m: 4,
+        display_gnss_error_rmse_m: 2,
+        latest_solve_error_rmse_m: 0.5,
+        latest_gnss_truth_error_rmse_m: 1.5,
+        latest_fused_worse_than_gnss: false
       },
       [
         { name: "live_frame_build", durationMs: 12 },
@@ -65,7 +71,13 @@ describe("viewer performance monitor", () => {
         formation_mode: "grid",
         motion_mode: "random_walk",
         mission_position_source: "backend",
-        live_solve_frame_changed: true
+        live_solve_frame_changed: true,
+        response_age_ms: 125,
+        display_error_rmse_m: 4,
+        display_gnss_error_rmse_m: 2,
+        latest_solve_error_rmse_m: 0.5,
+        latest_gnss_truth_error_rmse_m: 1.5,
+        latest_fused_worse_than_gnss: false
       })
     });
   });

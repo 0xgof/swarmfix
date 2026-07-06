@@ -9,6 +9,15 @@ export interface ViewerDiagnosticSample {
   gnssErrorRmseM?: number;
   gnssErrorMeanM?: number;
   gnssErrorMaxM?: number;
+  solveErrorRmseM?: number;
+  solveErrorMeanM?: number;
+  solveErrorMaxM?: number;
+  solveGnssErrorRmseM?: number;
+  solveGnssErrorMeanM?: number;
+  solveGnssErrorMaxM?: number;
+  solveImprovementRmseM?: number;
+  fusedWorseThanGnss?: boolean;
+  responseAgeMs?: number;
   missionDroneCount: number;
   formationMode: string;
   motionMode: string;

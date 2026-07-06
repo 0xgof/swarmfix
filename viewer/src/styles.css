@@ -46,7 +46,8 @@ body {
 
 .diagnostics-timeline-panel {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
+  grid-template-rows: auto;
   gap: 6px;
   box-sizing: border-box;
   width: 100%;
@@ -119,6 +120,45 @@ body {
 .diagnostics-timeline-path-secondary {
   stroke: #b24b24;
   stroke-dasharray: 6 4;
+}
+
+.diagnostics-timeline-path-solver {
+  stroke: #2468b2;
+  stroke-dasharray: 4 4;
+}
+
+.diagnostics-timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  min-height: 16px;
+  color: #333333;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.diagnostics-timeline-legend-item {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.diagnostics-timeline-legend-swatch {
+  width: 20px;
+  height: 0;
+  border-top: 2px solid #2468b2;
+}
+
+.diagnostics-timeline-legend-swatch.diagnostics-timeline-path-secondary {
+  border-top-color: #b24b24;
+  border-top-style: dashed;
+}
+
+.diagnostics-timeline-legend-swatch.diagnostics-timeline-path-solver {
+  border-top-color: #2468b2;
+  border-top-style: dashed;
 }
 
 .diagnostics-timeline-empty {

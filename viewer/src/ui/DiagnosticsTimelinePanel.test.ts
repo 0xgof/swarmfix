@@ -17,6 +17,15 @@ function sample(timestampMs: number,
     gnssErrorRmseM: errorRmseM * 2,
     gnssErrorMeanM: errorRmseM * 1.8,
     gnssErrorMaxM: errorRmseM * 2.5,
+    solveErrorRmseM: errorRmseM * 0.5,
+    solveErrorMeanM: errorRmseM * 0.4,
+    solveErrorMaxM: errorRmseM,
+    solveGnssErrorRmseM: errorRmseM * 1.5,
+    solveGnssErrorMeanM: errorRmseM * 1.3,
+    solveGnssErrorMaxM: errorRmseM * 2,
+    solveImprovementRmseM: errorRmseM,
+    fusedWorseThanGnss: false,
+    responseAgeMs: 125,
     missionDroneCount: 10,
     formationMode: "grid",
     motionMode: "random_walk",
@@ -38,13 +47,25 @@ describe("DiagnosticsTimelinePanel", () => {
 
     expect(panel.element.className).toContain("diagnostics-timeline-panel");
     expect(panel.element.textContent).toContain("cost vs time");
-    expect(panel.element.textContent).toContain("error vs time");
+    expect(panel.element.textContent).toContain("display tracking error");
+    expect(panel.element.textContent).not.toContain("solver snapshot error");
     expect(panel.element.textContent).toContain("last 60 s");
     expect(panel.element.textContent).toContain("30.000");
     expect(panel.element.textContent).toContain("0.600 m");
     expect(panel.element.textContent).toContain("GNSS 1.200 m");
-    expect(panel.element.querySelectorAll("path.diagnostics-timeline-path")).toHaveLength(3);
+    expect(panel.element.textContent).toContain("solver 0.300 m");
+    const legendItems = panel.element.querySelectorAll(".diagnostics-timeline-legend-item");
+    expect(legendItems).toHaveLength(3);
+    expect(panel.element.textContent).toContain("display");
+    expect(panel.element.textContent).toContain("GNSS");
+    expect(panel.element.textContent).toContain("solver snapshot");
+    expect(panel.element.querySelectorAll("path.diagnostics-timeline-path")).toHaveLength(4);
     expect(panel.element.querySelectorAll("path.diagnostics-timeline-path-secondary")).toHaveLength(1);
+    expect(panel.element.querySelectorAll("path.diagnostics-timeline-path-solver")).toHaveLength(1);
+    expect(
+      panel.element.querySelector(".diagnostics-timeline-path-solver")
+        ?.getAttribute("stroke-dasharray")
+    ).toBe("4 4");
     expect(panel.element.innerHTML).not.toContain("NaN");
   });
 
