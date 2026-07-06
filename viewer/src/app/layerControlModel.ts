@@ -28,16 +28,6 @@ function traceHasGnssResiduals(sceneTrace: SceneTrace): boolean {
   return hasGnssResiduals;
 }
 
-function traceHasCost(sceneTrace: SceneTrace): boolean {
-  const hasCost = sceneTrace.trace.iterations.some((iteration) => (
-    iteration.cost.total !== 0
-    || iteration.cost.gnss !== 0
-    || iteration.cost.uwb !== 0
-    || iteration.cost.reference !== 0
-  ));
-  return hasCost;
-}
-
 const layerDefinitions: LayerDefinition[] = [
   {
     key: "truth",
@@ -69,16 +59,6 @@ const layerDefinitions: LayerDefinition[] = [
     group: "Inputs",
     unavailableReason: (sceneTrace) => (
       sceneTrace.measurements.uwb.length > 0 ? null : "No UWB measurements are available."
-    )
-  },
-  {
-    key: "gnssOnly",
-    label: "GNSS-only baseline",
-    group: "Solver output",
-    unavailableReason: (sceneTrace) => (
-      estimateCount(sceneTrace, "gnss_only") > 0 || sceneTrace.measurements.gnss.length > 0
-        ? null
-        : "No GNSS-only baseline is available."
     )
   },
   {
@@ -123,14 +103,6 @@ const layerDefinitions: LayerDefinition[] = [
     group: "Diagnostics",
     unavailableReason: (sceneTrace) => (
       traceHasGnssResiduals(sceneTrace) ? null : "No GNSS residuals are available."
-    )
-  },
-  {
-    key: "cost",
-    label: "GNSS cost glyphs",
-    group: "Diagnostics",
-    unavailableReason: (sceneTrace) => (
-      traceHasCost(sceneTrace) ? null : "No trace cost values are available."
     )
   }
 ];

@@ -46,6 +46,8 @@ describe("viewer state and playback", () => {
 
     expect(viewerState.layers.uwbLinks).toBe(true);
     expect(viewerState.layers.positionError).toBe(true);
+    expect(viewerState.layers.gnssOnly).toBe(false);
+    expect(viewerState.layers.cost).toBe(false);
     viewerState.setLayerVisible("positionError", false);
     expect(viewerState.layers.positionError).toBe(false);
     viewerState.setIteration(99);

@@ -82,6 +82,12 @@ function itemByKey(key: string, scene = sceneTrace(), layers = allLayersVisible)
   return item!;
 }
 
+function itemKeys(scene = sceneTrace(), layers = allLayersVisible): string[] {
+  const items = buildLayerControlItems(scene, layers);
+  const keys = items.map((item) => item.key);
+  return keys;
+}
+
 describe("viewer layer control model", () => {
   it("marks reference and corrected handles unavailable when scene data is absent", () => {
     const reference = itemByKey("references");
@@ -125,10 +131,16 @@ describe("viewer layer control model", () => {
 
   it("uses labels that distinguish measurements, baselines, cords, and glyphs", () => {
     expect(itemByKey("gnss").label).toBe("GNSS measurement");
-    expect(itemByKey("gnssOnly").label).toBe("GNSS-only baseline");
     expect(itemByKey("uwbLinks").label).toBe("UWB cords");
     expect(itemByKey("residuals").label).toBe("GNSS residuals");
-    expect(itemByKey("cost").label).toBe("GNSS cost glyphs");
+  });
+
+  it("omits the redundant GNSS-only baseline handle from live layer controls", () => {
+    expect(itemKeys()).not.toContain("gnssOnly");
+  });
+
+  it("omits the inactive GNSS cost glyph handle from live layer controls", () => {
+    expect(itemKeys()).not.toContain("cost");
   });
 
   it("labels single-step iteration as exported trace inspection in live mode", () => {

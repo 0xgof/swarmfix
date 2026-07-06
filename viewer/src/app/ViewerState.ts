@@ -114,7 +114,7 @@ export function createViewerState(sceneTrace: SceneTrace): ViewerState {
       truth: true,
       gnss: true,
       gnssUncertainty: true,
-      gnssOnly: true,
+      gnssOnly: false,
       fused: true,
       corrected: true,
       references: true,
