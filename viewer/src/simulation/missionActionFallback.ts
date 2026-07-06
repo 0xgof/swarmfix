@@ -107,6 +107,32 @@ function randomCloudOffset(agentId: string): Position3D {
   return offset;
 }
 
+function squarePatrolOffset(agentId: string,
+                            index: number,
+                            count: number): Position3D {
+  if (count < 5) {
+    throw new Error("square_patrol formation requires at least 5 agents");
+  }
+
+  const squareCorners: Position3D[] = [
+    [-DEFAULT_SPACING_M, 0, -DEFAULT_SPACING_M],
+    [DEFAULT_SPACING_M, 0, -DEFAULT_SPACING_M],
+    [DEFAULT_SPACING_M, 0, DEFAULT_SPACING_M],
+    [-DEFAULT_SPACING_M, 0, DEFAULT_SPACING_M]
+  ];
+  if (index < squareCorners.length) {
+    return squareCorners[index];
+  }
+
+  const interiorScale = DEFAULT_SPACING_M * 0.55;
+  const offset: Position3D = [
+    (stableUnit(agentId, 97) - 0.5) * interiorScale * 2,
+    (stableUnit(agentId, 113) - 0.5) * DEFAULT_SPACING_M * 0.2,
+    (stableUnit(agentId, 109) - 0.5) * interiorScale * 2
+  ];
+  return offset;
+}
+
 function addPosition(a: Position3D,
                      b: Position3D): Position3D {
   const position: Position3D = [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -137,6 +163,27 @@ function randomWalkOffset(agentId: string,
   return offset;
 }
 
+function squarePatrolRandomWalkOffset(agentId: string,
+                                      formationOffset: Position3D,
+                                      timeSeconds: number,
+                                      amplitudeM: number): Position3D {
+  const rawDrift = randomWalkOffset(agentId, timeSeconds, amplitudeM);
+  const candidateX = Math.min(
+    DEFAULT_SPACING_M,
+    Math.max(-DEFAULT_SPACING_M, formationOffset[0] + rawDrift[0])
+  );
+  const candidateZ = Math.min(
+    DEFAULT_SPACING_M,
+    Math.max(-DEFAULT_SPACING_M, formationOffset[2] + rawDrift[2])
+  );
+  const drift: Position3D = [
+    candidateX - formationOffset[0],
+    rawDrift[1],
+    candidateZ - formationOffset[2]
+  ];
+  return drift;
+}
+
 export function fallbackFormationOffsets(agentIds: string[],
                                          formation: FormationMode): Map<string, Position3D> {
   const orderedIds = orderedAgentIds(agentIds);
@@ -153,6 +200,8 @@ export function fallbackFormationOffsets(agentIds: string[],
       offset = wedgeOffset(index);
     } else if (formation === "ring") {
       offset = ringOffset(index, count);
+    } else if (formation === "square_patrol") {
+      offset = squarePatrolOffset(agentId, index, count);
     } else if (formation === "random_cloud") {
       offset = randomCloudOffset(agentId);
     } else {
@@ -200,6 +249,10 @@ export function fallbackMissionActionPositions(agentIds: string[],
       : 1
   );
   const positions = new Map<string, Position3D>();
+  const orderedIds = orderedAgentIds(agentIds);
+  const squarePatrolCorners = new Set(
+    safeState.formation === "square_patrol" ? orderedIds.slice(0, 4) : []
+  );
 
   for (const agentId of agentIds) {
     const currentOffset = currentOffsets.get(agentId) ?? [0, 0, 0];
@@ -209,9 +262,21 @@ export function fallbackMissionActionPositions(agentIds: string[],
       currentOffset,
       transitionProgress
     );
-    const driftOffset = safeState.motion === "random_walk"
-      ? randomWalkOffset(agentId, timeSeconds, safeState.randomWalkAmplitudeM)
-      : [0, 0, 0] as Position3D;
+    let driftOffset: Position3D = [0, 0, 0];
+    if (safeState.motion === "random_walk") {
+      if (squarePatrolCorners.has(agentId)) {
+        driftOffset = [0, 0, 0];
+      } else if (safeState.formation === "square_patrol") {
+        driftOffset = squarePatrolRandomWalkOffset(
+          agentId,
+          formationOffset,
+          timeSeconds,
+          safeState.randomWalkAmplitudeM
+        );
+      } else {
+        driftOffset = randomWalkOffset(agentId, timeSeconds, safeState.randomWalkAmplitudeM);
+      }
+    }
     const position = addPosition(addPosition(center, formationOffset), driftOffset);
     positions.set(agentId, position);
   }

@@ -26,6 +26,7 @@ describe("explicit fallback mission action geometry", () => {
       "column",
       "wedge",
       "ring",
+      "square_patrol",
       "random_cloud"
     ];
 
@@ -71,6 +72,29 @@ describe("explicit fallback mission action geometry", () => {
       const offset = baseOffsets.get(agentId)!;
       expect(offsetDistance(position, offset)).toBeLessThanOrEqual(0.75);
     }
+  });
+
+  it("keeps square-patrol corners fixed while interior agents random-walk inside", () => {
+    const state: MissionActionState = {
+      ...defaultMissionActionState(),
+      formation: "square_patrol",
+      motion: "random_walk",
+      randomWalkAmplitudeM: 1
+    };
+
+    const startPositions = fallbackMissionActionPositions(agentIds, state, 1);
+    const laterPositions = fallbackMissionActionPositions(agentIds, state, 2);
+
+    expect(startPositions.get("agent_0")).toEqual([-3, 0, -3]);
+    expect(startPositions.get("agent_1")).toEqual([3, 0, -3]);
+    expect(startPositions.get("agent_2")).toEqual([3, 0, 3]);
+    expect(startPositions.get("agent_3")).toEqual([-3, 0, 3]);
+    for (const agentId of agentIds.slice(0, 4)) {
+      expect(laterPositions.get(agentId)).toEqual(startPositions.get(agentId));
+    }
+    expect(laterPositions.get("agent_4")).not.toEqual(startPositions.get("agent_4"));
+    expect(Math.abs(laterPositions.get("agent_4")![0])).toBeLessThanOrEqual(3);
+    expect(Math.abs(laterPositions.get("agent_4")![2])).toBeLessThanOrEqual(3);
   });
 
   it("gives fallback random-walk motion agent-specific temporal drift", () => {

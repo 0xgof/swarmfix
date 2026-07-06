@@ -85,6 +85,14 @@ export const fallbackMissionActionCatalog: MissionActionCatalog = {
       solverGeometryRisk: "low"
     },
     {
+      id: "square_patrol",
+      label: "square patrol",
+      description: "Local fallback square-corner patrol with interior rovers.",
+      parameters: ["random_walk_amplitude_m"],
+      geometryTraits: ["planar", "bounded", "requires_5_agents"],
+      solverGeometryRisk: "low"
+    },
+    {
       id: "random_cloud",
       label: "random cloud",
       description: "Local fallback deterministic random cloud.",

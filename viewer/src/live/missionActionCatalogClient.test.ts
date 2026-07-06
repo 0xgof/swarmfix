@@ -54,6 +54,7 @@ describe("mission action catalog client", () => {
       "column",
       "wedge",
       "ring",
+      "square_patrol",
       "random_cloud"
     ]);
     expect(fallbackMissionActionCatalog.motions.map((option) => option.id)).toEqual([

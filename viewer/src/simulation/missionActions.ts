@@ -1,4 +1,12 @@
-export type FormationMode = "grid" | "line" | "column" | "wedge" | "ring" | "random_cloud";
+export type FormationMode = (
+  "grid"
+  | "line"
+  | "column"
+  | "wedge"
+  | "ring"
+  | "square_patrol"
+  | "random_cloud"
+);
 export type MotionMode = "static" | "random_walk" | "forward" | "path_follow";
 export type PathMode = "loop" | "waypoints";
 
