@@ -501,4 +501,42 @@ describe("SwarmSceneRuntime", () => {
     expect(objectByUserData(runtime.scene, (userData) => userData.kind === "position-error"))
       .toBeNull();
   });
+
+  it("uses display-position overrides for fused markers and dependent UWB cords", () => {
+    const runtime = new SwarmSceneRuntime();
+
+    runtime.updateFrame({
+      sceneTrace,
+      selectedIteration: 0,
+      layers,
+      timeSeconds: 0,
+      maxUwbLinksPerAgent: 1,
+      motionAmplitudeM: 0.24,
+      displayFrame,
+      missionAction: null,
+      liveFrame: makeLiveFrame(),
+      displayPositions: {
+        fused: new Map<string, Position3D>([
+          ["agent_0", [4, 0, 0]],
+          ["agent_1", [6, 0, 0]]
+        ])
+      }
+    });
+
+    const fusedMarker = objectByUserData(runtime.scene, (userData) => (
+      userData.kind === "node"
+      && userData.agentId === "agent_0"
+      && userData.layer === "fused"
+    ));
+    const link = objectByUserData(runtime.scene, (userData) => (
+      userData.kind === "edge"
+      && userData.sourceId === "agent_0"
+      && userData.targetId === "agent_1"
+    )) as Line | null;
+    const linkPositions = positionsFromGeometry(link!);
+
+    expect(fusedMarker?.position.x).toBeCloseTo(4);
+    expect(linkPositions[0]).toBeCloseTo(4);
+    expect(linkPositions[linkPositions.length - 3]).toBeCloseTo(6);
+  });
 });

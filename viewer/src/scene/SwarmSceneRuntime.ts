@@ -8,6 +8,7 @@ import {
 
 import { liftPositionTo3D } from "../animation/liveMotion";
 import type { LayerVisibility } from "../app/ViewerState";
+import type { DisplayPositionOverrides } from "../app/DisplayFrameSmoother";
 import type { SceneTrace } from "../data/sceneTypes";
 import type { LiveSolveResponse } from "../live/liveSolveTypes";
 import {
@@ -43,6 +44,7 @@ export interface SwarmSceneFrame {
   displayFrame: LiveSolveResponse | null;
   missionAction: MissionActionState | null;
   liveFrame: LiveEstimationFrame;
+  displayPositions?: DisplayPositionOverrides;
 }
 
 type MarkerLayerKey = "truth" | "gnss" | "gnssOnly" | "fused" | "corrected" | "references";
@@ -139,8 +141,10 @@ export class SwarmSceneRuntime {
 
   updateFrame(frame: SwarmSceneFrame): void {
     const liveFrame = frame.liveFrame;
-    const fusedPositions = fusedPositionMap(frame.displayFrame);
-    const gnssOnlyPositions = gnssOnlyPositionMap(frame.displayFrame);
+    const fusedPositions = frame.displayPositions?.fused
+      ?? fusedPositionMap(frame.displayFrame);
+    const gnssOnlyPositions = frame.displayPositions?.gnssOnly
+      ?? gnssOnlyPositionMap(frame.displayFrame);
     const traceIteration = latestTraceIteration(frame.displayFrame);
 
     this.syncMarkerLayer(

@@ -59,6 +59,10 @@ import {
   type LayerVisibility,
   type ViewerState
 } from "./ViewerState";
+import {
+  DisplayFrameSmoother,
+  type DisplaySmoothingDiagnostics
+} from "./DisplayFrameSmoother";
 import { buildLayerControlItems } from "./layerControlModel";
 import { buildEdgeInspectorModel } from "../ui/EdgeDetailsPanel";
 import { createLayerControls } from "../ui/LayerControls";
@@ -96,6 +100,7 @@ const STATIC_MISSION_POSITION_REQUEST_INTERVAL_S = 1.0;
 const OBSERVABILITY_FLUSH_INTERVAL_MS = 1000;
 type MissionPositionSource = "backend" | "local_fallback";
 type FramePhaseRecorder = (name: string, durationMs: number) => void;
+const SLOW_FRAME_THRESHOLD_MS = 33;
 const CAMERA_FOLLOW_FALLBACK_DIRECTION = (() => {
   const x = 1.0;
   const y = 12.0;
@@ -128,6 +133,9 @@ export class App {
   private sceneRuntime: SwarmSceneRuntime | null;
   private startedAtMs: number;
   private liveSolveScheduler: LiveSolveScheduler<LiveFrameRequest>;
+  private displayFrameSmoother: DisplayFrameSmoother;
+  private latestDisplaySmoothing: DisplaySmoothingDiagnostics;
+  private lastFrameWasSlow: boolean;
   private observabilitySession: ViewerObservabilitySession;
   private performanceMonitor: PerformanceMonitor;
   private eventBuffer: BrowserEventBuffer;
@@ -173,6 +181,14 @@ export class App {
       (request) => this.requestLiveFrameWithObservability(request),
       250
     );
+    this.displayFrameSmoother = new DisplayFrameSmoother();
+    this.latestDisplaySmoothing = {
+      active: false,
+      reason: null,
+      ageMs: 0,
+      windowMs: 0
+    };
+    this.lastFrameWasSlow = false;
     this.observabilitySession = createViewerSession({
       component: "viewer",
       mode: "normal"
@@ -201,6 +217,14 @@ export class App {
     this.lastMissionPositionRequestAtS = null;
     this.latestLiveFrameResponse = null;
     this.liveFrameSource = "local_fallback";
+    this.displayFrameSmoother = new DisplayFrameSmoother();
+    this.latestDisplaySmoothing = {
+      active: false,
+      reason: null,
+      ageMs: 0,
+      windowMs: 0
+    };
+    this.lastFrameWasSlow = false;
     this.lastObservabilityFlushAtMs = performance.now();
     this.lastRenderedConnectionKey = null;
     this.diagnosticHistory = new DiagnosticHistory();
@@ -498,6 +522,11 @@ export class App {
     const timeSeconds = (performance.now() - this.startedAtMs) / 1000;
     const displayFrame = this.liveSolveScheduler.getDisplayFrame();
     const liveFrame = this.queueLiveSolve(timeSeconds);
+    const smoothedFrame = this.smoothFrameForDisplay(
+      liveFrame,
+      displayFrame,
+      performance.now()
+    );
     this.sceneRuntime?.updateFrame({
       sceneTrace: this.viewerState.sceneTrace,
       selectedIteration: this.viewerState.selectedIteration,
@@ -507,9 +536,10 @@ export class App {
       motionAmplitudeM: this.viewerState.motionAmplitudeM,
       displayFrame,
       missionAction: this.viewerState.missionAction,
-      liveFrame
+      liveFrame: smoothedFrame.liveFrame,
+      displayPositions: smoothedFrame.displayPositions
     });
-    this.updateCameraFollowTarget(liveFrame);
+    this.updateCameraFollowTarget(smoothedFrame.liveFrame);
     this.renderInspector();
   }
 
@@ -551,6 +581,9 @@ export class App {
         () => this.liveSolveScheduler.getDisplayFrame(nowMs)
       );
       const liveFrame = this.queueLiveSolve(timeSeconds, recordPhase);
+      const smoothedFrame = timePhase("display_smoothing", () => (
+        this.smoothFrameForDisplay(liveFrame, displayFrame, nowMs)
+      ));
       timePhase("connection_status", () => this.renderConnectionStatusIfChanged());
       timePhase("scene_update", () => sceneRuntime.updateFrame({
         sceneTrace: viewerState.sceneTrace,
@@ -561,9 +594,10 @@ export class App {
         motionAmplitudeM: viewerState.motionAmplitudeM,
         displayFrame,
         missionAction: viewerState.missionAction,
-        liveFrame
+        liveFrame: smoothedFrame.liveFrame,
+        displayPositions: smoothedFrame.displayPositions
       }));
-      timePhase("camera_follow", () => this.updateCameraFollowTarget(liveFrame));
+      timePhase("camera_follow", () => this.updateCameraFollowTarget(smoothedFrame.liveFrame));
       timePhase("orbit_controls", () => this.controls?.update());
       timePhase("render", () => renderer.render(sceneRuntime.scene, camera));
       const liveSolveFrameChanged = this.liveSolveScheduler.consumeFrameChanged();
@@ -580,11 +614,14 @@ export class App {
           selected_uwb_links: displayFrame?.metadata.selected_uwb_count ?? 0,
           live_solve_frame_changed: liveSolveFrameChanged,
           ...this.uwbSelectionFields(),
+          ...this.displaySmoothingFields(),
           ...this.qualityContextFields(),
           ...this.actionContextFields()
         },
         framePhases
       );
+      const frameDurationMs = performance.now() - frameStartMs;
+      this.lastFrameWasSlow = frameDurationMs > SLOW_FRAME_THRESHOLD_MS;
       if (liveSolveFrameChanged) {
         this.publishNewtonState(timeSeconds);
         this.renderConnectionStatusIfChanged();
@@ -729,6 +766,23 @@ export class App {
     this.previousSelectedUwbLinks = fallbackFrame.uwbLinks;
     this.latestUwbSelection = fallbackFrame.uwbSelection;
     return fallbackFrame;
+  }
+
+  private smoothFrameForDisplay(liveFrame: LiveEstimationFrame,
+                                displayFrame: LiveSolveResponse | null,
+                                nowMs: number): ReturnType<DisplayFrameSmoother["update"]> {
+    const smoothedFrame = this.displayFrameSmoother.update({
+      liveFrame,
+      displayFrame,
+      missionAction: this.viewerState!.missionAction,
+      missionDroneCount: this.viewerState!.missionDroneCount,
+      selectedUwbLinkCount: liveFrame.uwbSelection.selectedLinkCount,
+      latestSolvedFrameAgeMs: this.liveSolveScheduler.getLatestSolvedFrameAgeMs(nowMs),
+      recentFrameWasSlow: this.lastFrameWasSlow,
+      nowMs
+    });
+    this.latestDisplaySmoothing = smoothedFrame.diagnostics;
+    return smoothedFrame;
   }
 
   // Explicit disconnected/demo fallback: the only sanctioned normal-runtime
@@ -1291,6 +1345,17 @@ export class App {
       live_frame_source: this.liveFrameSource,
       mission_drone_count: this.viewerState?.missionDroneCount ?? 0,
       max_uwb_links_per_agent: this.viewerState?.maxUwbLinksPerAgent ?? 0
+    };
+    return fields;
+  }
+
+  private displaySmoothingFields(): Record<string, unknown> {
+    const smoothing = this.latestDisplaySmoothing;
+    const fields = {
+      display_smoothing_active: smoothing.active,
+      display_smoothing_reason: smoothing.reason,
+      display_smoothing_age_ms: smoothing.ageMs,
+      display_smoothing_window_ms: smoothing.windowMs
     };
     return fields;
   }

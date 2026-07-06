@@ -389,6 +389,8 @@ describe("App camera lifecycle", () => {
         )
       );
       expect(frameSample).toBeDefined();
+      expect(frameSample!.fields.display_smoothing_active).toBe(true);
+      expect(frameSample!.fields.display_smoothing_reason).toBe("formation_change");
     });
   });
 
