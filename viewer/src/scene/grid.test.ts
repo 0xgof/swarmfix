@@ -77,6 +77,37 @@ describe("viewer floor grid", () => {
     expect(`#${material.color.getHexString()}`).toBe(visualTokens.color.black);
   });
 
+  it("fades grid vertices toward the floor edges", () => {
+    const crosses = segmentsByName("grid-crosses");
+    const positions = crosses.geometry.getAttribute("position");
+    const colors = crosses.geometry.getAttribute("color");
+    expect(colors).toBeDefined();
+
+    let centerIndex = 0;
+    let edgeIndex = 0;
+    let nearestCenterDistance = Number.POSITIVE_INFINITY;
+    let farthestEdgeDistance = 0;
+    for (let index = 0; index < positions.count; index += 1) {
+      const x = positions.getX(index);
+      const z = positions.getZ(index);
+      const edgeDistance = Math.max(Math.abs(x), Math.abs(z));
+      if (edgeDistance < nearestCenterDistance) {
+        nearestCenterDistance = edgeDistance;
+        centerIndex = index;
+      }
+      if (edgeDistance > farthestEdgeDistance) {
+        farthestEdgeDistance = edgeDistance;
+        edgeIndex = index;
+      }
+    }
+
+    expect(colors.itemSize).toBe(4);
+    const centerAlpha = colors.getW(centerIndex);
+    const edgeAlpha = colors.getW(edgeIndex);
+    expect(centerAlpha).toBeGreaterThan(edgeAlpha);
+    expect(edgeAlpha).toBeLessThan(0.1);
+  });
+
   it("keeps the floor flat on the ground plane", () => {
     const crosses = segmentsByName("grid-crosses");
     for (const [, y] of segmentEndpoints(crosses)) {

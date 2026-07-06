@@ -14,16 +14,44 @@ const crossArmM = 0.07;
 const edgeGapM = 0.45;
 const crossOpacity = 0.3;
 const edgeOpacity = 0.07;
+const fadeStartRatio = 0.55;
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  const normalized = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
+  const smoothed = normalized * normalized * (3 - 2 * normalized);
+  return smoothed;
+}
+
+function edgeFadeAlpha(x: number, z: number): number {
+  const halfSize = gridSize / 2;
+  const fadeStart = halfSize * fadeStartRatio;
+  const edgeDistance = Math.max(Math.abs(x), Math.abs(z));
+  const edgeFade = 1 - smoothstep(fadeStart, halfSize, edgeDistance);
+  return edgeFade;
+}
+
+function colorsForPoints(points: number[]): number[] {
+  const colors: number[] = [];
+  for (let index = 0; index < points.length; index += 3) {
+    const x = points[index];
+    const z = points[index + 2];
+    const alpha = edgeFadeAlpha(x, z);
+    colors.push(1, 1, 1, alpha);
+  }
+  return colors;
+}
 
 function lineSegmentsFromPoints(points: number[],
                                 name: string,
                                 opacity: number): LineSegments {
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new Float32BufferAttribute(points, 3));
+  geometry.setAttribute("color", new Float32BufferAttribute(colorsForPoints(points), 4));
   const material = new LineBasicMaterial({
     color: visualTokens.color.black,
     transparent: true,
-    opacity
+    opacity,
+    vertexColors: true
   });
   const segments = new LineSegments(geometry, material);
   segments.name = name;
