@@ -1082,6 +1082,67 @@ describe("App camera lifecycle", () => {
     expect(plotBand?.style.width).toBe("100%");
   });
 
+  it("mounts the marker legend in the main viewport", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    app.mount(sceneTrace);
+
+    const viewport = root.querySelector<HTMLElement>(".viewer-viewport");
+    const sidePanel = root.querySelector<HTMLElement>(".side-panel");
+    const legend = root.querySelector<HTMLElement>(".marker-legend");
+
+    expect(legend).not.toBeNull();
+    expect(viewport?.contains(legend)).toBe(true);
+    expect(sidePanel?.contains(legend)).toBe(false);
+    expect(legend?.getAttribute("aria-label")).toBe("Marker legend");
+    expect(legend?.textContent).toContain("Ground truth");
+    expect(legend?.textContent).toContain("GNSS measurement");
+    expect(legend?.textContent).toContain("Fused estimate");
+    expect(legend?.textContent).toContain("UWB links");
+    expect(legend?.textContent).toContain("Position error");
+    expect(legend?.querySelector(".marker-legend-link-counter")?.textContent).toMatch(
+      /^\d+\/\d+ cap$/
+    );
+    expect(legend?.querySelector(".marker-legend-glyph-truth")).not.toBeNull();
+    expect(legend?.querySelector(".marker-legend-glyph-gnss")).not.toBeNull();
+    expect(legend?.querySelector(".marker-legend-glyph-fused")).not.toBeNull();
+    expect(legend?.querySelector(".marker-legend-glyph-uwb")).not.toBeNull();
+    expect(legend?.querySelector(".marker-legend-glyph-position-error")).not.toBeNull();
+  });
+
+  it("updates the marker legend UWB counter from selected links and the total cap", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    app.mount(sceneTrace);
+    const viewerState = (app as unknown as { viewerState: {
+      setMissionDroneCount: (count: number) => void;
+      setMaxUwbLinksPerAgent: (count: number) => void;
+    } }).viewerState;
+    viewerState.setMissionDroneCount(6);
+    viewerState.setMaxUwbLinksPerAgent(2);
+
+    (app as unknown as {
+      latestUwbSelection: LiveEstimationFrame["uwbSelection"];
+    }).latestUwbSelection = {
+      candidateLinkCount: 20,
+      selectedLinkCount: 4,
+      maxLinksPerAgent: 0,
+      connectedComponentCount: 1,
+      isolatedAgentCount: 0,
+      triangleCount: 0,
+      addedLinks: 0,
+      droppedLinks: 0,
+      selectionPolicy: "adaptive_range_graph_v1",
+      adaptiveSelectionEnabled: true
+    };
+    (app as unknown as { updateMarkerLegendStatus: () => void }).updateMarkerLegendStatus();
+
+    const counter = root.querySelector<HTMLElement>(".marker-legend-link-counter");
+    expect(counter?.textContent).toBe("4/6 cap");
+  });
+
   it("clears diagnostics plot state when the app is destroyed", () => {
     const root = document.createElement("div");
     const app = createTestApp(root);

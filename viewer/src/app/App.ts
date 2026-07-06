@@ -88,6 +88,7 @@ import {
   createViewportConnectionBadge,
   updateViewportConnectionBadge
 } from "../ui/ViewportConnectionBadge";
+import { createMarkerLegend, updateMarkerLegend } from "../ui/MarkerLegend";
 import { formatMeters, formatVector } from "../utils/formatting";
 
 const CAMERA_FOLLOW_PADDING = 1.35;
@@ -143,6 +144,7 @@ export class App {
   private connectionState: LiveSolverConnectionState;
   private lastRenderedConnectionStatus: LiveSolverConnectionStatus | null;
   private connectionBadge: HTMLElement | null;
+  private markerLegend: HTMLElement | null;
   private previousSelectedUwbLinks: LiveEstimationFrame["uwbLinks"];
   private latestUwbSelection: LiveEstimationFrame["uwbSelection"] | null;
   private linkCountControl: HTMLElement | null = null;
@@ -205,6 +207,7 @@ export class App {
     };
     this.lastRenderedConnectionStatus = null;
     this.connectionBadge = null;
+    this.markerLegend = null;
     this.previousSelectedUwbLinks = [];
     this.latestUwbSelection = null;
     this.cameraFollowDistanceM = null;
@@ -267,6 +270,7 @@ export class App {
       lastHealthyAtMs: null
     };
     this.lastRenderedConnectionStatus = null;
+    this.markerLegend = null;
     this.previousSelectedUwbLinks = [];
     this.latestUwbSelection = null;
     this.cameraFollowDistanceM = null;
@@ -358,6 +362,8 @@ export class App {
       lastError: this.connectionState.lastError
     });
     viewport.append(this.connectionBadge);
+    this.markerLegend = createMarkerLegend(this.markerLegendProps());
+    viewport.append(this.markerLegend);
     this.mountDiagnosticsPlotBand(viewport);
     this.renderConnectionStatus();
     this.refreshScene();
@@ -456,6 +462,7 @@ export class App {
         this.previousSelectedUwbLinks = [];
         this.latestUwbSelection = null;
         this.renderLinkCountControl();
+        this.updateMarkerLegendStatus();
         this.renderMissionActionControls(catalog);
         this.recordViewerEvent(
           "viewer_mission_drone_count_changed",
@@ -476,6 +483,7 @@ export class App {
       diagnostics: this.linkCountDiagnostics(),
       onChange: (count) => {
         this.viewerState!.setMaxUwbLinksPerAgent(count);
+        this.updateMarkerLegendStatus();
         this.refreshScene();
       }
     });
@@ -660,6 +668,7 @@ export class App {
     this.viewport = null;
     this.panel = null;
     this.connectionBadge = null;
+    this.markerLegend = null;
     this.linkCountControl = null;
     this.cameraFollowDistanceM = null;
     this.cameraFollowZoomReleasedByManualInput = false;
@@ -692,6 +701,34 @@ export class App {
     return diagnostics;
   }
 
+  private markerLegendProps(): { selectedUwbLinks: number; totalUwbLinkCap: number } {
+    const selectedUwbLinks = this.latestUwbSelection?.selectedLinkCount ?? 0;
+    const totalUwbLinkCap = this.totalUwbLinkCap();
+    const props = { selectedUwbLinks, totalUwbLinkCap };
+    return props;
+  }
+
+  private totalUwbLinkCap(): number {
+    const droneCount = this.viewerState?.missionDroneCount ?? 0;
+    const selectedMaxLinksPerAgent = this.latestUwbSelection?.maxLinksPerAgent ?? 0;
+    const stateMaxLinksPerAgent = this.viewerState?.maxUwbLinksPerAgent ?? 0;
+    const maxLinksPerAgent = selectedMaxLinksPerAgent > 0
+      ? selectedMaxLinksPerAgent
+      : stateMaxLinksPerAgent;
+    const completeGraphLinkCount = droneCount * Math.max(0, droneCount - 1) / 2;
+    const degreeCapLinkCount = Math.floor(droneCount * maxLinksPerAgent / 2);
+    const linkCap = Math.min(completeGraphLinkCount, degreeCapLinkCount);
+    return linkCap;
+  }
+
+  private updateMarkerLegendStatus(): void {
+    if (!this.markerLegend) {
+      return;
+    }
+
+    updateMarkerLegend(this.markerLegend, this.markerLegendProps());
+  }
+
   private queueLiveSolve(timeSeconds: number,
                          recordPhase: FramePhaseRecorder | null = null): LiveEstimationFrame {
     const timePhase = <T>(name: string, operation: () => T): T => {
@@ -711,6 +748,7 @@ export class App {
     if (this.linkCountControl) {
       updateLinkCountDiagnostics(this.linkCountControl, this.linkCountDiagnostics());
     }
+    this.updateMarkerLegendStatus();
     timePhase("live_solve_scheduler", () => {
       void this.liveSolveScheduler.tick(performance.now(), () => {
         const request = this.buildLiveFrameRequestForTick(timeSeconds);
@@ -1170,6 +1208,7 @@ export class App {
       this.liveFrameSource = "backend";
       this.previousSelectedUwbLinks = selectedLiveUwbLinksFromFrame(frame);
       this.latestUwbSelection = uwbSelectionDiagnosticsFromFrame(frame);
+      this.updateMarkerLegendStatus();
       const response = liveSolveResponseFromLiveFrame(frame);
       this.connectionState = updateConnectionState(this.connectionState, {
         ok: true,
