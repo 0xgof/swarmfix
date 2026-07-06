@@ -1,0 +1,958 @@
+{
+  "schema_version": "1",
+  "scenarios": [
+    {
+      "name": "grid9_initial_fill_cap3",
+      "positions": {
+        "agent_1": [
+          -3,
+          0,
+          -3
+        ],
+        "agent_2": [
+          0,
+          0,
+          -3
+        ],
+        "agent_3": [
+          3,
+          0,
+          -3
+        ],
+        "agent_4": [
+          -3,
+          0,
+          0
+        ],
+        "agent_5": [
+          0,
+          0,
+          0
+        ],
+        "agent_6": [
+          3,
+          0,
+          0
+        ],
+        "agent_7": [
+          -3,
+          0,
+          3
+        ],
+        "agent_8": [
+          0,
+          0,
+          3
+        ],
+        "agent_9": [
+          3,
+          0,
+          3
+        ]
+      },
+      "options": {
+        "max_range_m": null,
+        "add_range_m": null,
+        "drop_range_m": null,
+        "max_graph_changes_per_frame": 2,
+        "min_link_separation_deg": 10,
+        "max_links_per_agent": 3
+      },
+      "previous_selected_links": [],
+      "expected": {
+        "selected_links": [
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_2",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_4",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_9",
+            "measured_distance_m": 8.485281374238571,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_2",
+            "target_id": "agent_3",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_2",
+            "target_id": "agent_6",
+            "measured_distance_m": 4.242640687119286,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_3",
+            "target_id": "agent_6",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_4",
+            "target_id": "agent_5",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_4",
+            "target_id": "agent_7",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_5",
+            "target_id": "agent_7",
+            "measured_distance_m": 4.242640687119286,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_5",
+            "target_id": "agent_8",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_6",
+            "target_id": "agent_9",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_7",
+            "target_id": "agent_8",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_8",
+            "target_id": "agent_9",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          }
+        ],
+        "diagnostics": {
+          "candidate_link_count": 36,
+          "selected_link_count": 13,
+          "max_links_per_agent": 3,
+          "connected_component_count": 1,
+          "isolated_agent_count": 0,
+          "triangle_count": 3,
+          "added_links": 13,
+          "dropped_links": 0
+        }
+      }
+    },
+    {
+      "name": "grid9_retention_budget2",
+      "positions": {
+        "agent_1": [
+          -3,
+          0,
+          -2.65
+        ],
+        "agent_2": [
+          0.347082683658364,
+          0,
+          -3.2331966074479386
+        ],
+        "agent_3": [
+          2.910560614290609,
+          0,
+          -3.039253384427269
+        ],
+        "agent_4": [
+          -3.3240351388147062,
+          0,
+          0.2855037850438751
+        ],
+        "agent_5": [
+          0.17293967289851284,
+          0,
+          -0.34119526749145723
+        ],
+        "agent_6": [
+          3.2794704894182214,
+          0,
+          0.16915666556355205
+        ],
+        "agent_7": [
+          -3.24495614065774,
+          0,
+          3.1157852072821672
+        ],
+        "agent_8": [
+          -0.21634798928296164,
+          0,
+          2.676553519974404
+        ],
+        "agent_9": [
+          3.3007066351997736,
+          0,
+          3.315224060334669
+        ]
+      },
+      "options": {
+        "max_range_m": null,
+        "add_range_m": null,
+        "drop_range_m": null,
+        "max_graph_changes_per_frame": 2,
+        "min_link_separation_deg": 10,
+        "max_links_per_agent": 3
+      },
+      "previous_selected_links": [
+        {
+          "source_id": "agent_1",
+          "target_id": "agent_2",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_1",
+          "target_id": "agent_4",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_1",
+          "target_id": "agent_9",
+          "measured_distance_m": 8.485281374238571,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_2",
+          "target_id": "agent_3",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_2",
+          "target_id": "agent_6",
+          "measured_distance_m": 4.242640687119286,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_3",
+          "target_id": "agent_6",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_4",
+          "target_id": "agent_5",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_4",
+          "target_id": "agent_7",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_5",
+          "target_id": "agent_7",
+          "measured_distance_m": 4.242640687119286,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_5",
+          "target_id": "agent_8",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_6",
+          "target_id": "agent_9",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_7",
+          "target_id": "agent_8",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_8",
+          "target_id": "agent_9",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        }
+      ],
+      "expected": {
+        "selected_links": [
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_2",
+            "measured_distance_m": 3.3975109674855295,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_4",
+            "measured_distance_m": 2.9533339200289532,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_9",
+            "measured_distance_m": 8.676566267415128,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_2",
+            "target_id": "agent_3",
+            "measured_distance_m": 2.57080397436176,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_2",
+            "target_id": "agent_6",
+            "measured_distance_m": 4.491648476644305,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_3",
+            "target_id": "agent_6",
+            "measured_distance_m": 3.2295494337211768,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_4",
+            "target_id": "agent_5",
+            "measured_distance_m": 3.5526869459896675,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_4",
+            "target_id": "agent_7",
+            "measured_distance_m": 2.8313859533833816,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_5",
+            "target_id": "agent_7",
+            "measured_distance_m": 4.861350202905715,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_5",
+            "target_id": "agent_8",
+            "measured_distance_m": 3.0427541189156897,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_6",
+            "target_id": "agent_9",
+            "measured_distance_m": 3.146139066590919,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_7",
+            "target_id": "agent_8",
+            "measured_distance_m": 3.0602927653590553,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_8",
+            "target_id": "agent_9",
+            "measured_distance_m": 3.5745731620320025,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          }
+        ],
+        "diagnostics": {
+          "candidate_link_count": 36,
+          "selected_link_count": 13,
+          "max_links_per_agent": 3,
+          "connected_component_count": 1,
+          "isolated_agent_count": 0,
+          "triangle_count": 3,
+          "added_links": 0,
+          "dropped_links": 0
+        }
+      }
+    },
+    {
+      "name": "grid9_range_limited_drop",
+      "positions": {
+        "agent_1": [
+          -3,
+          0,
+          -3
+        ],
+        "agent_2": [
+          0,
+          0,
+          -3
+        ],
+        "agent_3": [
+          3,
+          0,
+          -3
+        ],
+        "agent_4": [
+          -3,
+          0,
+          0
+        ],
+        "agent_5": [
+          0,
+          0,
+          0
+        ],
+        "agent_6": [
+          3,
+          0,
+          0
+        ],
+        "agent_7": [
+          -3,
+          0,
+          3
+        ],
+        "agent_8": [
+          0,
+          0,
+          3
+        ],
+        "agent_9": [
+          3,
+          0,
+          3
+        ]
+      },
+      "options": {
+        "max_links_per_agent": 3,
+        "max_range_m": 4,
+        "add_range_m": 4,
+        "drop_range_m": 4.4,
+        "max_graph_changes_per_frame": 2,
+        "min_link_separation_deg": 10
+      },
+      "previous_selected_links": [
+        {
+          "source_id": "agent_1",
+          "target_id": "agent_2",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_1",
+          "target_id": "agent_4",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_1",
+          "target_id": "agent_9",
+          "measured_distance_m": 8.485281374238571,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_2",
+          "target_id": "agent_3",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_2",
+          "target_id": "agent_6",
+          "measured_distance_m": 4.242640687119286,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_3",
+          "target_id": "agent_6",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_4",
+          "target_id": "agent_5",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_4",
+          "target_id": "agent_7",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_5",
+          "target_id": "agent_7",
+          "measured_distance_m": 4.242640687119286,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_5",
+          "target_id": "agent_8",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_6",
+          "target_id": "agent_9",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_7",
+          "target_id": "agent_8",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        },
+        {
+          "source_id": "agent_8",
+          "target_id": "agent_9",
+          "measured_distance_m": 3,
+          "sigma_m": 0.12,
+          "selection_reason": "new"
+        }
+      ],
+      "expected": {
+        "selected_links": [
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_2",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_4",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_2",
+            "target_id": "agent_3",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_2",
+            "target_id": "agent_6",
+            "measured_distance_m": 4.242640687119286,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_3",
+            "target_id": "agent_6",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_4",
+            "target_id": "agent_5",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_4",
+            "target_id": "agent_7",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_5",
+            "target_id": "agent_7",
+            "measured_distance_m": 4.242640687119286,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_5",
+            "target_id": "agent_8",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_6",
+            "target_id": "agent_9",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_7",
+            "target_id": "agent_8",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          },
+          {
+            "source_id": "agent_8",
+            "target_id": "agent_9",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "retained"
+          }
+        ],
+        "diagnostics": {
+          "candidate_link_count": 15,
+          "selected_link_count": 12,
+          "max_links_per_agent": 3,
+          "connected_component_count": 1,
+          "isolated_agent_count": 0,
+          "triangle_count": 3,
+          "added_links": 0,
+          "dropped_links": 1
+        }
+      }
+    },
+    {
+      "name": "ring8_initial_fill_cap2",
+      "positions": {
+        "agent_1": [
+          6,
+          0,
+          0
+        ],
+        "agent_2": [
+          4.242640687119286,
+          0,
+          4.242640687119285
+        ],
+        "agent_3": [
+          3.6739403974420594e-16,
+          0,
+          6
+        ],
+        "agent_4": [
+          -4.242640687119285,
+          0,
+          4.242640687119286
+        ],
+        "agent_5": [
+          -6,
+          0,
+          7.347880794884119e-16
+        ],
+        "agent_6": [
+          -4.242640687119286,
+          0,
+          -4.242640687119285
+        ],
+        "agent_7": [
+          -1.102182119232618e-15,
+          0,
+          -6
+        ],
+        "agent_8": [
+          4.242640687119284,
+          0,
+          -4.242640687119286
+        ]
+      },
+      "options": {
+        "max_range_m": null,
+        "add_range_m": null,
+        "drop_range_m": null,
+        "max_graph_changes_per_frame": 2,
+        "min_link_separation_deg": 10,
+        "max_links_per_agent": 2
+      },
+      "previous_selected_links": [],
+      "expected": {
+        "selected_links": [
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_2",
+            "measured_distance_m": 4.592201188381077,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_8",
+            "measured_distance_m": 4.592201188381078,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_2",
+            "target_id": "agent_3",
+            "measured_distance_m": 4.592201188381078,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_3",
+            "target_id": "agent_4",
+            "measured_distance_m": 4.592201188381077,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_4",
+            "target_id": "agent_5",
+            "measured_distance_m": 4.592201188381077,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_5",
+            "target_id": "agent_6",
+            "measured_distance_m": 4.592201188381077,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_6",
+            "target_id": "agent_7",
+            "measured_distance_m": 4.592201188381077,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_7",
+            "target_id": "agent_8",
+            "measured_distance_m": 4.592201188381077,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          }
+        ],
+        "diagnostics": {
+          "candidate_link_count": 28,
+          "selected_link_count": 8,
+          "max_links_per_agent": 2,
+          "connected_component_count": 1,
+          "isolated_agent_count": 0,
+          "triangle_count": 0,
+          "added_links": 8,
+          "dropped_links": 0
+        }
+      }
+    },
+    {
+      "name": "line5_collinear_angle_gate",
+      "positions": {
+        "agent_1": [
+          0,
+          0,
+          0
+        ],
+        "agent_2": [
+          2,
+          0,
+          0
+        ],
+        "agent_3": [
+          4,
+          0,
+          0
+        ],
+        "agent_4": [
+          6,
+          0,
+          0
+        ],
+        "agent_5": [
+          8,
+          0,
+          0
+        ]
+      },
+      "options": {
+        "max_range_m": null,
+        "add_range_m": null,
+        "drop_range_m": null,
+        "max_graph_changes_per_frame": 2,
+        "min_link_separation_deg": 10,
+        "max_links_per_agent": 3
+      },
+      "previous_selected_links": [],
+      "expected": {
+        "selected_links": [
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_2",
+            "measured_distance_m": 2,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_2",
+            "target_id": "agent_3",
+            "measured_distance_m": 2,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_3",
+            "target_id": "agent_4",
+            "measured_distance_m": 2,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_4",
+            "target_id": "agent_5",
+            "measured_distance_m": 2,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          }
+        ],
+        "diagnostics": {
+          "candidate_link_count": 10,
+          "selected_link_count": 4,
+          "max_links_per_agent": 3,
+          "connected_component_count": 1,
+          "isolated_agent_count": 0,
+          "triangle_count": 0,
+          "added_links": 4,
+          "dropped_links": 0
+        }
+      }
+    },
+    {
+      "name": "grid6_cap1_pressure",
+      "positions": {
+        "agent_1": [
+          -3,
+          0,
+          -1.5
+        ],
+        "agent_2": [
+          0,
+          0,
+          -1.5
+        ],
+        "agent_3": [
+          3,
+          0,
+          -1.5
+        ],
+        "agent_4": [
+          -3,
+          0,
+          1.5
+        ],
+        "agent_5": [
+          0,
+          0,
+          1.5
+        ],
+        "agent_6": [
+          3,
+          0,
+          1.5
+        ]
+      },
+      "options": {
+        "max_range_m": null,
+        "add_range_m": null,
+        "drop_range_m": null,
+        "max_graph_changes_per_frame": 2,
+        "min_link_separation_deg": 10,
+        "max_links_per_agent": 1
+      },
+      "previous_selected_links": [],
+      "expected": {
+        "selected_links": [
+          {
+            "source_id": "agent_1",
+            "target_id": "agent_2",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_3",
+            "target_id": "agent_6",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          },
+          {
+            "source_id": "agent_4",
+            "target_id": "agent_5",
+            "measured_distance_m": 3,
+            "sigma_m": 0.12,
+            "selection_reason": "new"
+          }
+        ],
+        "diagnostics": {
+          "candidate_link_count": 15,
+          "selected_link_count": 3,
+          "max_links_per_agent": 1,
+          "connected_component_count": 3,
+          "isolated_agent_count": 0,
+          "triangle_count": 0,
+          "added_links": 3,
+          "dropped_links": 0
+        }
+      }
+    }
+  ]
+}

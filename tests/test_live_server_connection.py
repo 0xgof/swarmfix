@@ -62,10 +62,16 @@ def test_live_server_health_endpoint_rejects_post() -> None:
     assert status_code == 405
 
 
-def test_live_server_does_not_expose_backend_live_frame_sensor_generation() -> None:
-    """Mission frames must not bypass the canonical GNSS and UWB sensor modules."""
+def test_live_frame_endpoint_exists_and_validates_malformed_requests() -> None:
+    """``POST /live/frame`` is the backend-owned live boundary (BLF-004).
+
+    The earlier Stage 2 guard asserted this path returned 404 because the
+    BMA-002 frame builder bypassed canonical sensor behavior. The BLF plan
+    supersedes that boundary: the endpoint now exists and must reject
+    malformed intent with a clear 400 instead of being absent.
+    """
     server, base_url = _serve_for_test()
-    request = Request(f"{base_url}/live/frame", method="POST")
+    request = Request(f"{base_url}/live/frame", data=b"{}", method="POST")
     try:
         try:
             urlopen(request, timeout=2)
@@ -77,7 +83,7 @@ def test_live_server_does_not_expose_backend_live_frame_sensor_generation() -> N
         server.shutdown()
         server.server_close()
 
-    assert status_code == 404
+    assert status_code == 400
 
 
 def test_pyproject_declares_live_solver_console_script() -> None:

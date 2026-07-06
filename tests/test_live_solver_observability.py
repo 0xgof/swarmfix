@@ -160,7 +160,7 @@ def test_live_solver_creates_root_trace_context_when_request_omits_it() -> None:
 
 
 def test_live_server_builds_jsonl_sink_from_request_session(tmp_path, monkeypatch) -> None:
-    from swarmfix.live.server import observability_sink_for_request
+    from swarmfix.live.server import observability_sink_for_trace
 
     monkeypatch.setenv("SWARMFIX_OBSERVABILITY_ROOT", str(tmp_path))
     request = _live_request()
@@ -169,7 +169,7 @@ def test_live_server_builds_jsonl_sink_from_request_session(tmp_path, monkeypatc
         trace_id="trace-live",
         span_id="viewer-request-1",
     )
-    sink = observability_sink_for_request(request)
+    sink = observability_sink_for_trace(request.trace_context)
 
     response = solve_live_request(
         request,

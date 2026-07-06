@@ -16,28 +16,40 @@ from swarmfix.estimation.solver_backend import (
     SolverBackend,
     get_solver_backend,
 )
+from swarmfix.live.frame_builder import build_live_frame
 from swarmfix.live.mission_action_api import (
     build_catalog_response,
     build_positions_response,
 )
-from swarmfix.live.models import LiveSolveRequest, MissionActionPositionsRequest
+from swarmfix.live.models import (
+    LiveFrameRequest,
+    LiveSolveRequest,
+    MissionActionPositionsRequest,
+)
 from swarmfix.live.solve_request import solve_live_request
+from swarmfix.observability.events import TraceContext
 from swarmfix.observability.sink import JsonlSink, NoOpSink, ObservationSink
 
 
-def observability_sink_for_request(request: LiveSolveRequest) -> ObservationSink:
+def observability_sink_for_trace(trace_context: TraceContext | None) -> ObservationSink:
     """Build a session-scoped live-solver sink from request trace context."""
-    if request.trace_context is None:
+    if trace_context is None:
         return NoOpSink()
 
     root_dir = Path(os.environ.get("SWARMFIX_OBSERVABILITY_ROOT", "logs/observability"))
-    event_path = root_dir / request.trace_context.session_id / "trace_events.jsonl"
+    event_path = root_dir / trace_context.session_id / "trace_events.jsonl"
     sink = JsonlSink(event_path)
     return sink
 
 
 class LiveSolveHandler(BaseHTTPRequestHandler):
-    """HTTP handler exposing ``POST /solve`` for the Three.js viewer."""
+    """HTTP handler exposing ``POST /live/frame`` and ``POST /solve``.
+
+    ``/live/frame`` is the backend-owned normal-path boundary: the viewer
+    sends mission intent and options and receives a solved render-ready
+    frame. ``/solve`` stays available as the measurement-level API for
+    diagnostics, replay, and clients that already have measurements.
+    """
 
     server_version = "SwarmFixLiveSolve/0.1"
 
@@ -65,7 +77,22 @@ class LiveSolveHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self) -> None:
-        """Run one live solve request or return a validation error."""
+        """Run one live frame or solve request, or return a validation error."""
+        if self.path == "/live/frame":
+            try:
+                body = self._read_json_body()
+                request = LiveFrameRequest.model_validate(body)
+                sink = observability_sink_for_trace(request.trace_context)
+                response = build_live_frame(
+                    request,
+                    observability_sink=sink,
+                    solver_backend=self._solver_backend(),
+                )
+                self._write_json(200, response.model_dump(mode="json"))
+            except (json.JSONDecodeError, ValidationError, ValueError) as error:
+                self._write_json(400, {"error": str(error)})
+            return
+
         if self.path == "/mission-actions/positions":
             try:
                 body = self._read_json_body()
@@ -88,18 +115,22 @@ class LiveSolveHandler(BaseHTTPRequestHandler):
         try:
             body = self._read_json_body()
             request = LiveSolveRequest.model_validate(body)
-            sink = observability_sink_for_request(request)
-            solver_backend = getattr(self.server, "solver_backend", None)
-            if solver_backend is None:
-                solver_backend = get_solver_backend()
+            sink = observability_sink_for_trace(request.trace_context)
             response = solve_live_request(
                 request,
                 observability_sink=sink,
-                solver_backend=solver_backend,
+                solver_backend=self._solver_backend(),
             )
             self._write_json(200, response.model_dump())
         except (json.JSONDecodeError, ValidationError, ValueError) as error:
             self._write_json(400, {"error": str(error)})
+
+    def _solver_backend(self) -> SolverBackend:
+        """Return the server-selected solver backend or the default."""
+        solver_backend = getattr(self.server, "solver_backend", None)
+        if solver_backend is None:
+            solver_backend = get_solver_backend()
+        return solver_backend
 
     def _read_json_body(self) -> dict[str, Any]:
         """Read and parse one JSON request body."""
