@@ -82,6 +82,26 @@ type MissionPositionTestAccess = {
   missionPositionsForLiveFrame: (timeSeconds: number) => Map<string, Position3D>;
 };
 
+type DiagnosticHistoryTestAccess = {
+  diagnosticHistorySampleCount: () => number;
+};
+
+type DiagnosticSampleAppendTestAccess = {
+  appendDiagnosticSample: (
+    timeSeconds: number,
+    liveFrame: LiveEstimationFrame | null,
+    displayFrame: unknown
+  ) => void;
+};
+
+type LiveSolveSchedulerTestAccess = {
+  liveSolveScheduler: {
+    frameChanged: boolean;
+    latestSolvedFrame: unknown;
+    previousSolvedFrame: unknown;
+  };
+};
+
 class FakeBroadcastChannel {
   static postedMessages: unknown[] = [];
   name: string;
@@ -131,6 +151,38 @@ function liveFrameFromPositions(
     }
   };
   return liveFrame;
+}
+
+function diagnosticSampleCount(app: App): number {
+  const sampleCount = (app as unknown as DiagnosticHistoryTestAccess)
+    .diagnosticHistorySampleCount();
+  return sampleCount;
+}
+
+function seedChangedLiveSolveFrame(app: App): void {
+  const schedulerAccess = app as unknown as LiveSolveSchedulerTestAccess;
+  schedulerAccess.liveSolveScheduler.previousSolvedFrame = null;
+  schedulerAccess.liveSolveScheduler.latestSolvedFrame = {
+    schema_version: "0.1.0",
+    metadata: { solver: "test", selected_uwb_count: 0 },
+    truth: [{ agent_id: "agent_0", position_m: [0, 0, 0] }],
+    measurements: { gnss: [], uwb: [] },
+    estimates: { fused: [{ agent_id: "agent_0", position_m: [0.1, 0, 0] }], gnss_only: [] },
+    trace: {
+      trace_type: "live_solve",
+      iterations: [{
+        iteration: 0,
+        positions: { agent_0: [0.1, 0, 0] },
+        cost_total: 1,
+        cost_gnss: 0.5,
+        cost_uwb: 0.5,
+        gnss_residuals: [],
+        uwb_residuals: []
+      }]
+    },
+    constraints: { nodes: [], edges: [] }
+  };
+  schedulerAccess.liveSolveScheduler.frameChanged = true;
 }
 
 function liveFrameWithHorizontalRadius(radiusM: number): LiveEstimationFrame {
@@ -996,6 +1048,36 @@ describe("App camera lifecycle", () => {
     expect(connectionStatus!.textContent).toContain("Live solver:");
   });
 
+  it("mounts diagnostics plots at the bottom of the main viewport outside the side panel", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    app.mount(sceneTrace);
+
+    const viewport = root.querySelector<HTMLElement>(".viewer-viewport");
+    const sidePanel = root.querySelector<HTMLElement>(".side-panel");
+    const plotBand = root.querySelector<HTMLElement>(".diagnostics-plot-band");
+
+    expect(plotBand).not.toBeNull();
+    expect(viewport?.contains(plotBand)).toBe(true);
+    expect(sidePanel?.contains(plotBand)).toBe(false);
+    expect(plotBand?.style.height).toBe("33.333vh");
+    expect(plotBand?.style.width).toBe("100%");
+  });
+
+  it("clears diagnostics plot state when the app is destroyed", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    app.mount(sceneTrace);
+    expect(root.querySelector(".diagnostics-plot-band")).not.toBeNull();
+
+    app.destroy();
+
+    expect(root.querySelector(".diagnostics-plot-band")).toBeNull();
+    expect(diagnosticSampleCount(app)).toBe(0);
+  });
+
   it("releases the WebGL renderer when the app is destroyed", () => {
     const root = document.createElement("div");
     const app = createTestApp(root);
@@ -1041,6 +1123,115 @@ describe("App camera lifecycle", () => {
     }
 
     expect(performanceFlushes).toHaveLength(0);
+  });
+
+  it("updates diagnostics plots only when a live solve frame changes", () => {
+    const animationCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => {
+        animationCallbacks.push(callback);
+        return animationCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation(() => undefined);
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    try {
+      app.mount(sceneTrace);
+      animationCallbacks[0](16);
+      animationCallbacks[1](32);
+      expect(diagnosticSampleCount(app)).toBe(0);
+
+      seedChangedLiveSolveFrame(app);
+      animationCallbacks[2](300);
+      expect(diagnosticSampleCount(app)).toBe(1);
+
+      animationCallbacks[3](316);
+      expect(diagnosticSampleCount(app)).toBe(1);
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
+  });
+
+  it("resets diagnostics plots for a fresh stream of data", () => {
+    const animationCallbacks: FrameRequestCallback[] = [];
+    const requestAnimationFrameSpy = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => {
+        animationCallbacks.push(callback);
+        return animationCallbacks.length;
+      });
+    const cancelAnimationFrameSpy = vi
+      .spyOn(window, "cancelAnimationFrame")
+      .mockImplementation(() => undefined);
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+
+    try {
+      app.mount(sceneTrace);
+      seedChangedLiveSolveFrame(app);
+      animationCallbacks[0](300);
+      expect(diagnosticSampleCount(app)).toBe(1);
+
+      root.querySelector<HTMLButtonElement>(".diagnostics-timeline-reset")?.click();
+
+      expect(diagnosticSampleCount(app)).toBe(0);
+      expect(root.querySelector(".diagnostics-timeline-panel")?.textContent)
+        .toContain("waiting for live solver data");
+    } finally {
+      requestAnimationFrameSpy.mockRestore();
+      cancelAnimationFrameSpy.mockRestore();
+    }
+  });
+
+  it("plots raw GNSS baseline error against current truth as an error overlay", () => {
+    const root = document.createElement("div");
+    const app = createTestApp(root);
+    const liveFrame = liveFrameFromPositions([
+      ["agent_0", [0, 0, 0]],
+      ["agent_1", [3, 0, 0]]
+    ]);
+    liveFrame.gnssPositions = new Map<string, Position3D>([
+      ["agent_0", [0, 5, 0]],
+      ["agent_1", [3, 5, 0]]
+    ]);
+    const displayFrame = {
+      schema_version: "0.1.0",
+      metadata: { solver: "test", selected_uwb_count: 0 },
+      truth: [],
+      measurements: { gnss: [], uwb: [] },
+      estimates: {
+        fused: [
+          { agent_id: "agent_0", position_m: [0.1, 0, 0] },
+          { agent_id: "agent_1", position_m: [3.1, 0, 0] }
+        ],
+        gnss_only: []
+      },
+      trace: {
+        trace_type: "live_solve",
+        iterations: [{
+          iteration: 0,
+          positions: {},
+          cost_total: 1,
+          cost_gnss: 0.5,
+          cost_uwb: 0.5,
+          gnss_residuals: [],
+          uwb_residuals: []
+        }]
+      },
+      constraints: { nodes: [], edges: [] }
+    };
+
+    app.mount(sceneTrace);
+    (app as unknown as DiagnosticSampleAppendTestAccess)
+      .appendDiagnosticSample(1, liveFrame, displayFrame);
+
+    expect(root.querySelector(".diagnostics-timeline-panel")?.textContent)
+      .toContain("GNSS 5.000 m");
   });
 
   it("does not publish Newton shared state during normal viewer operation", () => {

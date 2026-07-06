@@ -21,9 +21,109 @@ body {
 
 .viewer-viewport {
   position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 2fr) 33.333vh;
   min-width: 0;
   min-height: 0;
   background: #fbfbf8;
+}
+
+.viewer-viewport canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0;
+}
+
+.diagnostics-plot-band {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 180px;
+  border-top: 1px solid #d8dce0;
+  background: rgba(255, 255, 255, 0.94);
+  overflow: hidden;
+}
+
+.diagnostics-timeline-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 10px 14px;
+  color: #111111;
+  font-size: 12px;
+}
+
+.diagnostics-timeline-title,
+.diagnostics-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.diagnostics-timeline-title {
+  font-weight: 700;
+}
+
+.diagnostics-timeline-title-actions {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  font-weight: 500;
+}
+
+.diagnostics-timeline-window {
+  color: #555555;
+  font-weight: 500;
+}
+
+.diagnostics-timeline-reset {
+  padding: 3px 8px;
+  border: 1px solid #c8d0d8;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1f4d83;
+  font: inherit;
+  cursor: pointer;
+}
+
+.diagnostics-timeline-reset:hover {
+  border-color: #2468b2;
+  background: #eef5ff;
+}
+
+.diagnostics-timeline-plot {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.diagnostics-timeline-plot svg {
+  width: 100%;
+  height: 100%;
+  min-height: 48px;
+  border: 1px solid #e2e6ea;
+  background: #fbfbf8;
+}
+
+.diagnostics-timeline-path {
+  fill: none;
+  stroke: #2468b2;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.diagnostics-timeline-path-secondary {
+  stroke: #b24b24;
+  stroke-dasharray: 6 4;
+}
+
+.diagnostics-timeline-empty {
+  margin: 0;
+  color: #555555;
 }
 
 .connection-badge {

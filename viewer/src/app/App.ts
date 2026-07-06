@@ -7,7 +7,8 @@ import type { Position3D } from "../animation/liveMotion";
 import {
   buildInitialLiveSolveResponse,
   buildLiveSolveRequest,
-  type LiveSolveRequest
+  type LiveSolveRequest,
+  type LiveSolveResponse
 } from "../live/liveSolveTypes";
 import {
   requestMissionActionCatalog,
@@ -66,6 +67,13 @@ import { createMissionActionControls } from "../ui/MissionActionControls";
 import { createSidePanel } from "../ui/SidePanel";
 import { getCostBreakdown } from "../ui/CostBreakdownPanel";
 import { getPositionErrorBreakdown } from "../ui/PositionErrorPanel";
+import {
+  DiagnosticHistory,
+  displayErrorBreakdown,
+  gnssTruthErrorBreakdown
+} from "../ui/DiagnosticsTimelineHistory";
+import type { ViewerDiagnosticSample } from "../ui/DiagnosticsTimelineHistory";
+import { DiagnosticsTimelinePanel } from "../ui/DiagnosticsTimelinePanel";
 import { buildConnectionStatusModel } from "../ui/ConnectionStatusPanel";
 import {
   createViewportConnectionBadge,
@@ -136,6 +144,9 @@ export class App {
   private latestLiveSolveRequest: LiveSolveRequest | null;
   private lastObservabilityFlushAtMs: number;
   private lastRenderedConnectionKey: string | null;
+  private diagnosticHistory: DiagnosticHistory;
+  private diagnosticsTimelinePanel: DiagnosticsTimelinePanel | null;
+  private diagnosticsPlotBand: HTMLElement | null;
 
   constructor(root: HTMLElement,
               sceneUrl = "/examples/full_workflow_demo.json") {
@@ -181,6 +192,9 @@ export class App {
     this.latestLiveSolveRequest = null;
     this.lastObservabilityFlushAtMs = performance.now();
     this.lastRenderedConnectionKey = null;
+    this.diagnosticHistory = new DiagnosticHistory();
+    this.diagnosticsTimelinePanel = null;
+    this.diagnosticsPlotBand = null;
   }
 
   getCameraForTest(): ReturnType<typeof createCamera> | null {
@@ -229,6 +243,9 @@ export class App {
     this.lastMissionPositionRequestAtS = null;
     this.lastObservabilityFlushAtMs = performance.now();
     this.lastRenderedConnectionKey = null;
+    this.diagnosticHistory.cleanup();
+    this.diagnosticsTimelinePanel = null;
+    this.diagnosticsPlotBand = null;
     const initialLiveFrame = buildLiveEstimationFrame(
       sceneTrace,
       0,
@@ -319,6 +336,7 @@ export class App {
       lastError: this.connectionState.lastError
     });
     viewport.append(this.connectionBadge);
+    this.mountDiagnosticsPlotBand(viewport);
     this.renderConnectionStatus();
     this.refreshScene();
     this.renderInspector();
@@ -332,12 +350,12 @@ export class App {
 
     viewport.innerHTML = "";
     const width = Math.max(800, viewport.clientWidth || 800);
-    const height = Math.max(500, viewport.clientHeight || 500);
+    const sceneHeight = Math.max(334, Math.round((viewport.clientHeight || 750) * 2 / 3));
     const renderer = new WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(width, height);
+    renderer.setSize(width, sceneHeight);
     this.renderer = renderer;
-    this.camera = createCamera(width, height);
+    this.camera = createCamera(width, sceneHeight);
     this.controls = new OrbitControls(this.camera, renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.target.set(8, 0, 5);
@@ -350,6 +368,31 @@ export class App {
       this.renderInspector();
     });
     viewport.append(renderer.domElement);
+  }
+
+  diagnosticHistorySampleCount(): number {
+    const count = this.diagnosticHistory.count();
+    return count;
+  }
+
+  private mountDiagnosticsPlotBand(viewport: HTMLElement): void {
+    const plotBand = document.createElement("section");
+    plotBand.className = "diagnostics-plot-band";
+    plotBand.style.height = "33.333vh";
+    plotBand.style.width = "100%";
+    const panel = new DiagnosticsTimelinePanel({
+      onReset: () => this.resetDiagnosticsPlots()
+    });
+    panel.update([]);
+    plotBand.append(panel.element);
+    viewport.append(plotBand);
+    this.diagnosticsPlotBand = plotBand;
+    this.diagnosticsTimelinePanel = panel;
+  }
+
+  private resetDiagnosticsPlots(): void {
+    this.diagnosticHistory.clear();
+    this.diagnosticsTimelinePanel?.update([]);
   }
 
   private layerControlItems(): Array<{ key: string; label: string; visible: boolean }> {
@@ -525,6 +568,11 @@ export class App {
       timePhase("orbit_controls", () => this.controls?.update());
       timePhase("render", () => renderer.render(sceneRuntime.scene, camera));
       const liveSolveFrameChanged = this.liveSolveScheduler.consumeFrameChanged();
+      if (liveSolveFrameChanged) {
+        timePhase("diagnostic_plot_update", () => {
+          this.appendDiagnosticSample(timeSeconds, liveFrame, displayFrame);
+        });
+      }
       timePhase("observability_flush_check", () => this.flushObservability());
       this.performanceMonitor.recordFrame(
         `viewer-frame-${Math.round(timeSeconds * 1000)}`,
@@ -555,6 +603,11 @@ export class App {
     }
 
     this.flushObservability(true);
+    this.diagnosticsTimelinePanel?.dispose();
+    this.diagnosticsTimelinePanel = null;
+    this.diagnosticsPlotBand?.remove();
+    this.diagnosticsPlotBand = null;
+    this.diagnosticHistory.cleanup();
     this.controls?.dispose();
     this.controls = null;
     this.sceneRuntime?.dispose();
@@ -657,6 +710,59 @@ export class App {
       });
     });
     return liveFrame;
+  }
+
+  private appendDiagnosticSample(timeSeconds: number,
+                                 liveFrame: LiveEstimationFrame | null,
+                                 displayFrame: LiveSolveResponse | null): void {
+    if (!this.viewerState || !liveFrame || !displayFrame) {
+      return;
+    }
+
+    const latestIteration = displayFrame.trace.iterations[
+      displayFrame.trace.iterations.length - 1
+    ];
+    if (!latestIteration) {
+      return;
+    }
+
+    const displayError = displayErrorBreakdown(
+      liveFrame.truthPositions,
+      displayFrame.estimates.fused
+    );
+    if (!displayError) {
+      return;
+    }
+    const gnssError = gnssTruthErrorBreakdown(
+      liveFrame.truthPositions,
+      liveFrame.gnssPositions
+    );
+
+    const action = this.viewerState.missionAction;
+    const sample: ViewerDiagnosticSample = {
+      timestampMs: Math.round(timeSeconds * 1000),
+      costTotal: latestIteration.cost_total,
+      costGnss: latestIteration.cost_gnss,
+      costUwb: latestIteration.cost_uwb,
+      errorRmseM: displayError.rmseM,
+      errorMeanM: displayError.meanErrorM,
+      errorMaxM: displayError.maxErrorM,
+      ...(gnssError
+        ? {
+          gnssErrorRmseM: gnssError.rmseM,
+          gnssErrorMeanM: gnssError.meanErrorM,
+          gnssErrorMaxM: gnssError.maxErrorM
+        }
+        : {}),
+      missionDroneCount: this.viewerState.missionDroneCount,
+      formationMode: action.formation,
+      motionMode: action.motion,
+      speedMps: action.speedMps,
+      randomWalkAmplitudeM: action.randomWalkAmplitudeM,
+      selectedUwbLinks: displayFrame.metadata.selected_uwb_count
+    };
+    this.diagnosticHistory.append(sample);
+    this.diagnosticsTimelinePanel?.update(this.diagnosticHistory.samples());
   }
 
   private publishNewtonState(timeSeconds: number,
