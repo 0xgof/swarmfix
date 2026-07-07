@@ -14,6 +14,7 @@ dependencies = [
 swarmfix-run = "swarmfix.cli:main"
 swarmfix-run-all = "swarmfix.run_all_configs:main"
 swarmfix-live-server = "swarmfix.live.server:main"
+swarmfix-performance-baseline = "swarmfix.observability.performance_baseline:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

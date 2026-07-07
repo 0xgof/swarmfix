@@ -1,33 +1,34 @@
 # SwarmFix
 
-SwarmFix is a proof-of-concept Python package for cooperative GNSS/UWB
-localisation in swarms of drones, robots, or mobile agents.
+SwarmFix is a proof-of-concept system for cooperative GNSS/UWB localisation in
+swarms of drones, robots, or mobile agents.
 
-The project explores whether a swarm with noisy absolute GNSS measurements and
-more accurate inter-agent UWB range measurements can improve localisation by
-constraining the swarm geometry.
+The project explores how noisy absolute GNSS measurements and more accurate
+inter-agent UWB ranges can be fused to improve swarm-relative geometry while
+making the remaining absolute-position limits visible.
 
 ## Current Scope
 
-The current implementation covers a static 2D MVP:
+The current implementation includes:
 
 - typed scenario, measurement, estimate, residual, metric, and result records;
-- square and grid formation generation;
-- full-pairwise and neighbour topology graph generation;
-- GNSS simulation with common bias and independent noise;
-- UWB range simulation;
-- optional mission reference measurements;
-- GNSS-only baseline estimation;
-- rigid topology alignment;
-- weighted GNSS/UWB least-squares fusion;
-- mission-level translation bias correction;
-- absolute and relative evaluation metrics;
+- square, grid, trajectory, and topology scenario generation;
+- GNSS simulation with common bias, independent noise, spatial correlation, and
+  optional outliers;
+- UWB range simulation and optional mission reference measurements;
+- GNSS-only baseline estimation, rigid topology alignment, weighted GNSS/UWB
+  fusion, and mission-level translation bias correction;
+- a pluggable solver backend boundary with Python/SciPy and native C UWB/GNSS
+  backends;
+- absolute, relative, orientation, bias, and comparison metrics;
 - TOML config loading with Pydantic validation;
-- end-to-end pipeline orchestration;
-- JSON scene and solver-trace export;
-- Python-side plotting helpers.
-
-The Three.js viewer is planned but not implemented yet.
+- end-to-end pipeline orchestration and root-config batch execution;
+- JSON scene and solver-trace export for viewer replay;
+- Python-side plotting helpers and experiment scripts;
+- JSONL observability events, performance metrics, and summaries;
+- a live Python solve API for the viewer;
+- a Vite/Three.js viewer with scene replay, live solve requests, adaptive UWB
+  link selection, mission action controls, diagnostics, and a UI catalog.
 
 ## Key Limitation
 
@@ -38,21 +39,27 @@ or a known mission reference point.
 
 ## Requirements
 
-Use Python 3.11 or newer. The repo has been tested with:
+Use Python 3.11 or newer. The project has been exercised locally with Python
+3.12. On Windows, use `py -3.12` if `python` resolves to an older interpreter
+or is not on `PATH`.
 
-```text
-Python 3.12.7
-pytest 7.4.4
-```
-
-The package depends on:
+The Python package depends on:
 
 - matplotlib
 - numpy
 - pydantic
 - scipy
 
-## Run The Program
+The viewer uses Node, Vite, TypeScript, Vitest, and Three.js. Install viewer
+dependencies from `viewer/` with `npm install`.
+
+The native C solver backend is optional for most Python development paths, but
+the live server defaults to `c-uwb-gnss`. Build it from
+`native/uwb_gnss_solver/` with a C toolchain and CMake before using the default
+live backend, or select the Python reference backend explicitly with
+`--solver-backend python-scipy`.
+
+## Run The Python Pipeline
 
 Run one TOML config from the repository root:
 
@@ -82,23 +89,91 @@ swarmfix-run configs/04_mission_reference.toml --output-dir outputs/mission_refe
 swarmfix-run-all configs --output-root outputs
 ```
 
+## Run The Live Solver
+
+Start the Python live solve API:
+
+```bash
+python -m swarmfix.live.server --host 127.0.0.1 --port 8765
+```
+
+Use the Python reference backend when the native C solver has not been built:
+
+```bash
+python -m swarmfix.live.server --host 127.0.0.1 --port 8765 --solver-backend python-scipy
+```
+
+After editable install, the console script is:
+
+```bash
+swarmfix-live-server --host 127.0.0.1 --port 8765
+```
+
+The viewer expects the live API at `http://127.0.0.1:8765` by default. The
+server exposes `GET /health`, `POST /live/frame`, `POST /solve`,
+`GET /mission-actions/catalog`, and `POST /mission-actions/positions`.
+
+## Run The Viewer
+
+From `viewer/`:
+
+```bash
+npm install
+npm run dev
+```
+
+The viewer serves the default app and UI catalog through Vite. It loads example
+scene JSON from `viewer/public/examples/`, can call the live solver, and exposes
+visual diagnostics for GNSS uncertainty, UWB links, residuals, position error,
+connection status, and mission action state.
+
+Useful viewer commands:
+
+```bash
+npm run test
+npm run build
+```
+
 ## Run Tests
 
-From the repository root:
+Python tests from the repository root:
 
 ```bash
 python -m pytest -q tests
 ```
 
+On Windows with the Python launcher:
+
+```bash
+py -3.12 -m pytest -q tests
+```
+
 Expected current result:
 
 ```text
-40 passed
+198 passed
 ```
 
-If VS Code shows discovery failures, make sure the selected interpreter is
-Python 3.11+ and not an older global Python. This repo uses `tomllib`, which is
-available in the standard library from Python 3.11 onward.
+Viewer tests from `viewer/`:
+
+```bash
+npm run test -- --run
+```
+
+Current full-suite note:
+
+```text
+50 test files discovered, 288 tests discovered.
+```
+
+The full viewer suite is currently broader than the focused checks used during
+viewer feature work. In this checkout, `npm run test -- --run` may fail on
+slow grid tests in constrained environments; use focused Vitest file targets
+when validating a scoped viewer change.
+
+If VS Code shows Python discovery failures, make sure the selected interpreter
+is Python 3.11+ and not an older global Python. This repo uses `tomllib`, which
+is available in the standard library from Python 3.11 onward.
 
 ## Minimal Pipeline Usage
 
@@ -122,17 +197,22 @@ export_solver_trace_json(result, "outputs/square_static/scene_trace.json")
 ## Repository Layout
 
 ```text
+configs/              Root TOML scenarios.
+experiments/          Reproducible experiment and profiling scripts.
+native/               Optional native UWB/GNSS C solver backend.
 swarmfix/
-    estimation/       GNSS-only, rigid topology, fusion, and bias correction.
-    evaluation/       Absolute and relative metrics.
+    estimation/       Solver backends, fusion, alignment, and bias correction.
+    evaluation/       Absolute, relative, orientation, bias, and comparison metrics.
     io/               TOML config loading and JSON export.
+    live/             HTTP live-solver API and request models.
     models/           Shared typed data contracts.
-    scenarios/        Formation and topology generation.
+    observability/    JSONL events, performance metrics, sinks, and summaries.
+    scenarios/        Formation, topology, trajectory, and scenario generation.
     sensors/          GNSS, UWB, and reference simulation.
     visualisation/    Python-side plotting helpers.
     workflow/         End-to-end pipeline orchestration.
-
-tests/                Module-focused pytest suite.
+tests/                Python pytest suite.
+viewer/               Vite/Three.js viewer, UI catalog, and Vitest suite.
 ```
 
 ## Development Notes
@@ -141,4 +221,5 @@ The implementation should stay test-first. For behavioural changes, add or
 update tests before changing implementation code, run the expected failing test,
 then implement the smallest change needed to pass.
 
-Keep generated outputs under `outputs/`. That directory is ignored by Git.
+Keep generated outputs under `outputs/`, observability logs under `logs/`, and
+local planning or agent scratch files under ignored local paths.

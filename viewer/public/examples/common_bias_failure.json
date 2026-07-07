@@ -1,0 +1,2196 @@
+{
+  "agents": [
+    {
+      "fused": [
+        1.9436922281835325,
+        0.06595503152977626
+      ],
+      "gnss": [
+        2.0,
+        0.0
+      ],
+      "gnss_only": [
+        2.0,
+        0.0
+      ],
+      "id": "robot_0",
+      "truth": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "fused": [
+        7.040628503567305,
+        -0.028222950144974127
+      ],
+      "gnss": [
+        7.0,
+        0.0
+      ],
+      "gnss_only": [
+        7.0,
+        0.0
+      ],
+      "id": "robot_1",
+      "truth": [
+        5.0,
+        0.0
+      ]
+    },
+    {
+      "fused": [
+        1.9956882718421773,
+        4.918366941862842
+      ],
+      "gnss": [
+        2.0,
+        5.0
+      ],
+      "gnss_only": [
+        2.0,
+        5.0
+      ],
+      "id": "robot_2",
+      "truth": [
+        0.0,
+        5.0
+      ]
+    },
+    {
+      "fused": [
+        7.019990052881682,
+        5.043901593398324
+      ],
+      "gnss": [
+        7.0,
+        5.0
+      ],
+      "gnss_only": [
+        7.0,
+        5.0
+      ],
+      "id": "robot_3",
+      "truth": [
+        5.0,
+        5.0
+      ]
+    }
+  ],
+  "metadata": {
+    "dimension": 2,
+    "scenario": "common_bias_failure",
+    "units": "meters"
+  },
+  "metrics": {
+    "fused": {
+      "absolute_mae": 2.000864704762559,
+      "absolute_rmse": 2.001185496572249,
+      "absolute_rmse_improvement": -0.0005927482861245448,
+      "centroid_error": 1.99999976411868,
+      "max_error": 2.0408236632512433,
+      "relative_rmse": 0.08028360135396911,
+      "solver_cost_reduction": 0.9910905584636962
+    },
+    "gnss_only": {
+      "absolute_mae": 2.0,
+      "absolute_rmse": 2.0,
+      "absolute_rmse_improvement": 0.0,
+      "centroid_error": 2.0,
+      "max_error": 2.0,
+      "relative_rmse": 0.0,
+      "solver_cost_reduction": 0.9910905584636962
+    }
+  },
+  "reference_points": [],
+  "schema_version": "0.1.0",
+  "trace": {
+    "iterations": [
+      {
+        "cost_gnss": 0.0,
+        "cost_reference": 0.0,
+        "cost_total": 15.622395847659568,
+        "cost_uwb": 15.622395847659568,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          }
+        ],
+        "iteration": 0,
+        "positions": {
+          "robot_0": [
+            2.0,
+            0.0
+          ],
+          "robot_1": [
+            7.0,
+            0.0
+          ],
+          "robot_2": [
+            2.0,
+            5.0
+          ],
+          "robot_3": [
+            7.0,
+            5.0
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": -0.09133782799787138,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 3.3370395293474946
+          },
+          {
+            "residual_m": 0.15391659550990155,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 9.476127349343459
+          },
+          {
+            "residual_m": -0.047903198765442134,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.9178865807845827
+          },
+          {
+            "residual_m": -0.003481861383047402,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.004849343476302707
+          },
+          {
+            "residual_m": -0.06591250120905379,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 1.7377831262534067
+          },
+          {
+            "residual_m": -0.019281462499919577,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.14870991845432197
+          }
+        ]
+      },
+      {
+        "cost_gnss": 2.220446049250313e-16,
+        "cost_reference": 0.0,
+        "cost_total": 15.622398832911184,
+        "cost_uwb": 15.622398832911184,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 2.9802322387695312e-08,
+            "vector": [
+              2.9802322387695312e-08,
+              0.0
+            ],
+            "weighted_sq": 2.220446049250313e-16
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          }
+        ],
+        "iteration": 1,
+        "positions": {
+          "robot_0": [
+            2.0000000298023224,
+            0.0
+          ],
+          "robot_1": [
+            7.0,
+            0.0
+          ],
+          "robot_2": [
+            2.0,
+            5.0
+          ],
+          "robot_3": [
+            7.0,
+            5.0
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": -0.09133785780019377,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 3.337041707011367
+          },
+          {
+            "residual_m": 0.15391659550990155,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 9.476127349343459
+          },
+          {
+            "residual_m": -0.04790321983886692,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.9178873883723252
+          },
+          {
+            "residual_m": -0.003481861383047402,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.004849343476302707
+          },
+          {
+            "residual_m": -0.06591250120905379,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 1.7377831262534067
+          },
+          {
+            "residual_m": -0.019281462499919577,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.14870991845432197
+          }
+        ]
+      },
+      {
+        "cost_gnss": 5.551115123125783e-17,
+        "cost_reference": 0.0,
+        "cost_total": 15.6223944166247,
+        "cost_uwb": 15.6223944166247,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 1.4901161193847656e-08,
+            "vector": [
+              0.0,
+              1.4901161193847656e-08
+            ],
+            "weighted_sq": 5.551115123125783e-17
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          }
+        ],
+        "iteration": 2,
+        "positions": {
+          "robot_0": [
+            2.0,
+            1.4901161193847656e-08
+          ],
+          "robot_1": [
+            7.0,
+            0.0
+          ],
+          "robot_2": [
+            2.0,
+            5.0
+          ],
+          "robot_3": [
+            7.0,
+            5.0
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": -0.09133782799787138,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 3.3370395293474946
+          },
+          {
+            "residual_m": 0.15391658060874036,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 9.476125514514747
+          },
+          {
+            "residual_m": -0.04790320930215497,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.9178869845784265
+          },
+          {
+            "residual_m": -0.003481861383047402,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.004849343476302707
+          },
+          {
+            "residual_m": -0.06591250120905379,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 1.7377831262534067
+          },
+          {
+            "residual_m": -0.019281462499919577,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.14870991845432197
+          }
+        ]
+      },
+      {
+        "cost_gnss": 2.7200464103316335e-15,
+        "cost_reference": 0.0,
+        "cost_total": 15.622388020394464,
+        "cost_uwb": 15.62238802039446,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 1.043081283569336e-07,
+            "vector": [
+              1.043081283569336e-07,
+              0.0
+            ],
+            "weighted_sq": 2.7200464103316335e-15
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          }
+        ],
+        "iteration": 3,
+        "positions": {
+          "robot_0": [
+            2.0,
+            0.0
+          ],
+          "robot_1": [
+            7.000000104308128,
+            0.0
+          ],
+          "robot_2": [
+            2.0,
+            5.0
+          ],
+          "robot_3": [
+            7.0,
+            5.0
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": -0.09133772368974302,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 3.3370319075295374
+          },
+          {
+            "residual_m": 0.15391659550990155,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 9.476127349343459
+          },
+          {
+            "residual_m": -0.047903198765442134,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.9178865807845827
+          },
+          {
+            "residual_m": -0.003481787626061994,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.004849138029199366
+          },
+          {
+            "residual_m": -0.0659125012090529,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 1.7377831262533598
+          },
+          {
+            "residual_m": -0.019281462499919577,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.14870991845432197
+          }
+        ]
+      },
+      {
+        "cost_gnss": 5.551115123125783e-17,
+        "cost_reference": 0.0,
+        "cost_total": 15.622396662747844,
+        "cost_uwb": 15.622396662747844,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 1.4901161193847656e-08,
+            "vector": [
+              0.0,
+              1.4901161193847656e-08
+            ],
+            "weighted_sq": 5.551115123125783e-17
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          }
+        ],
+        "iteration": 4,
+        "positions": {
+          "robot_0": [
+            2.0,
+            0.0
+          ],
+          "robot_1": [
+            7.0,
+            1.4901161193847656e-08
+          ],
+          "robot_2": [
+            2.0,
+            5.0
+          ],
+          "robot_3": [
+            7.0,
+            5.0
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": -0.09133782799787138,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 3.3370395293474946
+          },
+          {
+            "residual_m": 0.15391659550990155,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 9.476127349343459
+          },
+          {
+            "residual_m": -0.047903198765442134,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.9178865807845827
+          },
+          {
+            "residual_m": -0.0034818719197602377,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.004849372826245937
+          },
+          {
+            "residual_m": -0.06591251611021498,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 1.7377839119917398
+          },
+          {
+            "residual_m": -0.019281462499919577,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.14870991845432197
+          }
+        ]
+      },
+      {
+        "cost_gnss": 2.220446049250313e-16,
+        "cost_reference": 0.0,
+        "cost_total": 15.622396366065786,
+        "cost_uwb": 15.622396366065786,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 2.9802322387695312e-08,
+            "vector": [
+              2.9802322387695312e-08,
+              0.0
+            ],
+            "weighted_sq": 2.220446049250313e-16
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          }
+        ],
+        "iteration": 5,
+        "positions": {
+          "robot_0": [
+            2.0,
+            0.0
+          ],
+          "robot_1": [
+            7.0,
+            0.0
+          ],
+          "robot_2": [
+            2.0000000298023224,
+            5.0
+          ],
+          "robot_3": [
+            7.0,
+            5.0
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": -0.09133782799787138,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 3.3370395293474946
+          },
+          {
+            "residual_m": 0.15391659550990155,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 9.476127349343459
+          },
+          {
+            "residual_m": -0.047903198765442134,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.9178865807845827
+          },
+          {
+            "residual_m": -0.003481882456472185,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.004849402176275511
+          },
+          {
+            "residual_m": -0.06591250120905379,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 1.7377831262534067
+          },
+          {
+            "residual_m": -0.019281492302241965,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.14871037816056645
+          }
+        ]
+      },
+      {
+        "cost_gnss": 1.3877787807814457e-15,
+        "cost_reference": 0.0,
+        "cost_total": 15.622404875057402,
+        "cost_uwb": 15.6224048750574,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 7.450580596923828e-08,
+            "vector": [
+              0.0,
+              7.450580596923828e-08
+            ],
+            "weighted_sq": 1.3877787807814457e-15
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          }
+        ],
+        "iteration": 6,
+        "positions": {
+          "robot_0": [
+            2.0,
+            0.0
+          ],
+          "robot_1": [
+            7.0,
+            0.0
+          ],
+          "robot_2": [
+            2.0,
+            5.000000074505806
+          ],
+          "robot_3": [
+            7.0,
+            5.0
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": -0.09133782799787138,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 3.3370395293474946
+          },
+          {
+            "residual_m": 0.15391667001570752,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 9.47613652348968
+          },
+          {
+            "residual_m": -0.047903198765442134,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.9178865807845827
+          },
+          {
+            "residual_m": -0.003481808699486777,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.004849196727928721
+          },
+          {
+            "residual_m": -0.06591250120905379,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 1.7377831262534067
+          },
+          {
+            "residual_m": -0.01928146249991869,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.14870991845430825
+          }
+        ]
+      },
+      {
+        "cost_gnss": 2.7200464103316335e-15,
+        "cost_reference": 0.0,
+        "cost_total": 15.622391412139015,
+        "cost_uwb": 15.622391412139011,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 1.043081283569336e-07,
+            "vector": [
+              1.043081283569336e-07,
+              0.0
+            ],
+            "weighted_sq": 2.7200464103316335e-15
+          }
+        ],
+        "iteration": 7,
+        "positions": {
+          "robot_0": [
+            2.0,
+            0.0
+          ],
+          "robot_1": [
+            7.0,
+            0.0
+          ],
+          "robot_2": [
+            2.0,
+            5.0
+          ],
+          "robot_3": [
+            7.000000104308128,
+            5.0
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": -0.09133782799787138,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 3.3370395293474946
+          },
+          {
+            "residual_m": 0.15391659550990155,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 9.476127349343459
+          },
+          {
+            "residual_m": -0.047903125008456726,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.9178837542303329
+          },
+          {
+            "residual_m": -0.003481861383047402,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.004849343476302707
+          },
+          {
+            "residual_m": -0.0659125012090529,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 1.7377831262533598
+          },
+          {
+            "residual_m": -0.01928135819179122,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.14870830948806177
+          }
+        ]
+      },
+      {
+        "cost_gnss": 1.3877787807814457e-15,
+        "cost_reference": 0.0,
+        "cost_total": 15.622389900002807,
+        "cost_uwb": 15.622389900002805,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.0,
+            "vector": [
+              0.0,
+              0.0
+            ],
+            "weighted_sq": 0.0
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 7.450580596923828e-08,
+            "vector": [
+              0.0,
+              7.450580596923828e-08
+            ],
+            "weighted_sq": 1.3877787807814457e-15
+          }
+        ],
+        "iteration": 8,
+        "positions": {
+          "robot_0": [
+            2.0,
+            0.0
+          ],
+          "robot_1": [
+            7.0,
+            0.0
+          ],
+          "robot_2": [
+            2.0,
+            5.0
+          ],
+          "robot_3": [
+            7.0,
+            5.000000074505806
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": -0.09133782799787138,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 3.3370395293474946
+          },
+          {
+            "residual_m": 0.15391659550990155,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 9.476127349343459
+          },
+          {
+            "residual_m": -0.04790314608188151,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.9178845618168319
+          },
+          {
+            "residual_m": -0.003481861383047402,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.004849343476302707
+          },
+          {
+            "residual_m": -0.06591242670324782,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 1.7377791975644064
+          },
+          {
+            "residual_m": -0.01928146249991869,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.14870991845430825
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.00476896153156605,
+        "cost_reference": 0.0,
+        "cost_total": 0.14030571870983585,
+        "cost_uwb": 0.1355367571782698,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08693351933033863,
+            "vector": [
+              -0.056633328062649424,
+              0.06595531014032673
+            ],
+            "weighted_sq": 0.00188935919578959
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.049720257104310224,
+            "vector": [
+              0.040932652990604446,
+              -0.0282244908841501
+            ],
+            "weighted_sq": 0.0006180259916296778
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08180435976592061,
+            "vector": [
+              -0.004915991595433544,
+              -0.08165651415132658
+            ],
+            "weighted_sq": 0.0016729883191780428
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.04852166629326491,
+            "vector": [
+              0.020616134989106527,
+              0.043924105887153786
+            ],
+            "weighted_sq": 0.0005885880249687401
+          }
+        ],
+        "iteration": 9,
+        "positions": {
+          "robot_0": [
+            1.9433666719373506,
+            0.06595531014032673
+          ],
+          "robot_1": [
+            7.0409326529906044,
+            -0.0282244908841501
+          ],
+          "robot_2": [
+            1.9950840084045665,
+            4.918343485848673
+          ],
+          "robot_3": [
+            7.0206161349891065,
+            5.043924105887154
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.007098085702764045,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.02015312825751334
+          },
+          {
+            "residual_m": 0.006580368186249075,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.017320498186639575
+          },
+          {
+            "residual_m": -0.00851143044283642,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.028977779273297036
+          },
+          {
+            "residual_m": -0.008495378770634332,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.0288685841826178
+          },
+          {
+            "residual_m": 0.006276784359142695,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.01575920875647135
+          },
+          {
+            "residual_m": 0.007819456266539682,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.02445755852173068
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.004768960711560407,
+        "cost_reference": 0.0,
+        "cost_total": 0.14030569265279505,
+        "cost_uwb": 0.13553673194123464,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08693350046521645,
+            "vector": [
+              -0.05663329910422932,
+              0.06595531014032673
+            ],
+            "weighted_sq": 0.0018893583757839468
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.049720257104310224,
+            "vector": [
+              0.040932652990604446,
+              -0.0282244908841501
+            ],
+            "weighted_sq": 0.0006180259916296778
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08180435976592061,
+            "vector": [
+              -0.004915991595433544,
+              -0.08165651415132658
+            ],
+            "weighted_sq": 0.0016729883191780428
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.04852166629326491,
+            "vector": [
+              0.020616134989106527,
+              0.043924105887153786
+            ],
+            "weighted_sq": 0.0005885880249687401
+          }
+        ],
+        "iteration": 10,
+        "positions": {
+          "robot_0": [
+            1.9433667008957707,
+            0.06595531014032673
+          ],
+          "robot_1": [
+            7.0409326529906044,
+            -0.0282244908841501
+          ],
+          "robot_2": [
+            1.9950840084045665,
+            4.918343485848673
+          ],
+          "robot_3": [
+            7.0206161349891065,
+            5.043924105887154
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.00709805674928532,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.020152963846429953
+          },
+          {
+            "residual_m": 0.0065803678776248375,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.017320496561950723
+          },
+          {
+            "residual_m": -0.008511451120701174,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.028977920072034112
+          },
+          {
+            "residual_m": -0.008495378770634332,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.0288685841826178
+          },
+          {
+            "residual_m": 0.006276784359142695,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.01575920875647135
+          },
+          {
+            "residual_m": 0.007819456266539682,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.02445755852173068
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.00476896202297146,
+        "cost_reference": 0.0,
+        "cost_total": 0.140305713358921,
+        "cost_uwb": 0.13553675133594956,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08693353063565287,
+            "vector": [
+              -0.056633328062649424,
+              0.06595532504148792
+            ],
+            "weighted_sq": 0.0018893596871949994
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.049720257104310224,
+            "vector": [
+              0.040932652990604446,
+              -0.0282244908841501
+            ],
+            "weighted_sq": 0.0006180259916296778
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08180435976592061,
+            "vector": [
+              -0.004915991595433544,
+              -0.08165651415132658
+            ],
+            "weighted_sq": 0.0016729883191780428
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.04852166629326491,
+            "vector": [
+              0.020616134989106527,
+              0.043924105887153786
+            ],
+            "weighted_sq": 0.0005885880249687401
+          }
+        ],
+        "iteration": 11,
+        "positions": {
+          "robot_0": [
+            1.9433666719373506,
+            0.06595532504148792
+          ],
+          "robot_1": [
+            7.0409326529906044,
+            -0.0282244908841501
+          ],
+          "robot_2": [
+            1.9950840084045665,
+            4.918343485848673
+          ],
+          "robot_3": [
+            7.0206161349891065,
+            5.043924105887154
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.007098085978022972,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.020153129820562533
+          },
+          {
+            "residual_m": 0.006580353285934315,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.017320419747082615
+          },
+          {
+            "residual_m": -0.008511440875005327,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.02897785030748458
+          },
+          {
+            "residual_m": -0.008495378770634332,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.0288685841826178
+          },
+          {
+            "residual_m": 0.006276784359142695,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.01575920875647135
+          },
+          {
+            "residual_m": 0.007819456266539682,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.02445755852173068
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.004768963678856328,
+        "cost_reference": 0.0,
+        "cost_total": 0.14030580945584462,
+        "cost_uwb": 0.1355368457769883,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08693351933033863,
+            "vector": [
+              -0.056633328062649424,
+              0.06595531014032673
+            ],
+            "weighted_sq": 0.00188935919578959
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.04972034347910142,
+            "vector": [
+              0.0409327579086769,
+              -0.0282244908841501
+            ],
+            "weighted_sq": 0.0006180281389199558
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08180435976592061,
+            "vector": [
+              -0.004915991595433544,
+              -0.08165651415132658
+            ],
+            "weighted_sq": 0.0016729883191780428
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.04852166629326491,
+            "vector": [
+              0.020616134989106527,
+              0.043924105887153786
+            ],
+            "weighted_sq": 0.0005885880249687401
+          }
+        ],
+        "iteration": 12,
+        "positions": {
+          "robot_0": [
+            1.9433666719373506,
+            0.06595531014032673
+          ],
+          "robot_1": [
+            7.040932757908677,
+            -0.0282244908841501
+          ],
+          "robot_2": [
+            1.9950840084045665,
+            4.918343485848673
+          ],
+          "robot_3": [
+            7.0206161349891065,
+            5.043924105887154
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.0070981906029352615,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.020153723934239382
+          },
+          {
+            "residual_m": 0.006580368186249075,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.017320498186639575
+          },
+          {
+            "residual_m": -0.00851143044283642,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.028977779273297036
+          },
+          {
+            "residual_m": -0.008495303848945923,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.028868074994366166
+          },
+          {
+            "residual_m": 0.006276784779390532,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.01575921086671546
+          },
+          {
+            "residual_m": 0.007819456266539682,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.02445755852173068
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.00476896174185495,
+        "cost_reference": 0.0,
+        "cost_total": 0.1403057244121086,
+        "cost_uwb": 0.13553676267025364,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08693351933033863,
+            "vector": [
+              -0.056633328062649424,
+              0.06595531014032673
+            ],
+            "weighted_sq": 0.00188935919578959
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.04972026556319173,
+            "vector": [
+              0.040932652990604446,
+              -0.028224505785311292
+            ],
+            "weighted_sq": 0.0006180262019185774
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08180435976592061,
+            "vector": [
+              -0.004915991595433544,
+              -0.08165651415132658
+            ],
+            "weighted_sq": 0.0016729883191780428
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.04852166629326491,
+            "vector": [
+              0.020616134989106527,
+              0.043924105887153786
+            ],
+            "weighted_sq": 0.0005885880249687401
+          }
+        ],
+        "iteration": 13,
+        "positions": {
+          "robot_0": [
+            1.9433666719373506,
+            0.06595531014032673
+          ],
+          "robot_1": [
+            7.0409326529906044,
+            -0.028224505785311292
+          ],
+          "robot_2": [
+            1.9950840084045665,
+            4.918343485848673
+          ],
+          "robot_3": [
+            7.0206161349891065,
+            5.043924105887154
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.007098085978022972,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.020153129820562533
+          },
+          {
+            "residual_m": 0.006580368186249075,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.017320498186639575
+          },
+          {
+            "residual_m": -0.00851143044283642,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.028977779273297036
+          },
+          {
+            "residual_m": -0.008495368339125342,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.028868513286965308
+          },
+          {
+            "residual_m": 0.006276799260183985,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.01575928358105849
+          },
+          {
+            "residual_m": 0.007819456266539682,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.02445755852173068
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.004768961458492346,
+        "cost_reference": 0.0,
+        "cost_total": 0.14030567867284363,
+        "cost_uwb": 0.1355367172143513,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08693351933033863,
+            "vector": [
+              -0.056633328062649424,
+              0.06595531014032673
+            ],
+            "weighted_sq": 0.00188935919578959
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.049720257104310224,
+            "vector": [
+              0.040932652990604446,
+              -0.0282244908841501
+            ],
+            "weighted_sq": 0.0006180259916296778
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08180435797937267,
+            "vector": [
+              -0.004915961866365226,
+              -0.08165651415132658
+            ],
+            "weighted_sq": 0.0016729882461043385
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.04852166629326491,
+            "vector": [
+              0.020616134989106527,
+              0.043924105887153786
+            ],
+            "weighted_sq": 0.0005885880249687401
+          }
+        ],
+        "iteration": 14,
+        "positions": {
+          "robot_0": [
+            1.9433666719373506,
+            0.06595531014032673
+          ],
+          "robot_1": [
+            7.0409326529906044,
+            -0.0282244908841501
+          ],
+          "robot_2": [
+            1.9950840381336348,
+            4.918343485848673
+          ],
+          "robot_3": [
+            7.0206161349891065,
+            5.043924105887154
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.007098085702764045,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.02015312825751334
+          },
+          {
+            "residual_m": 0.006580368503087186,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.01732049985456876
+          },
+          {
+            "residual_m": -0.00851143044283642,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.028977779273297036
+          },
+          {
+            "residual_m": -0.008495400000073872,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.028868728464502055
+          },
+          {
+            "residual_m": 0.006276784359142695,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.01575920875647135
+          },
+          {
+            "residual_m": 0.007819426546748609,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.02445737260799875
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.004768958539304074,
+        "cost_reference": 0.0,
+        "cost_total": 0.14030574137175905,
+        "cost_uwb": 0.135536782832455,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08693351933033863,
+            "vector": [
+              -0.056633328062649424,
+              0.06595531014032673
+            ],
+            "weighted_sq": 0.00188935919578959
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.049720257104310224,
+            "vector": [
+              0.040932652990604446,
+              -0.0282244908841501
+            ],
+            "weighted_sq": 0.0006180259916296778
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08180428660934745,
+            "vector": [
+              -0.004915991595433544,
+              -0.08165644086229751
+            ],
+            "weighted_sq": 0.001672985326916066
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.04852166629326491,
+            "vector": [
+              0.020616134989106527,
+              0.043924105887153786
+            ],
+            "weighted_sq": 0.0005885880249687401
+          }
+        ],
+        "iteration": 15,
+        "positions": {
+          "robot_0": [
+            1.9433666719373506,
+            0.06595531014032673
+          ],
+          "robot_1": [
+            7.0409326529906044,
+            -0.0282244908841501
+          ],
+          "robot_2": [
+            1.9950840084045665,
+            4.9183435591377025
+          ],
+          "robot_3": [
+            7.0206161349891065,
+            5.043924105887154
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.007098085702764045,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.02015312825751334
+          },
+          {
+            "residual_m": 0.0065804414711161385,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.017320883981914052
+          },
+          {
+            "residual_m": -0.00851143044283642,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.028977779273297036
+          },
+          {
+            "residual_m": -0.008495327464890678,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.028868235494290354
+          },
+          {
+            "residual_m": 0.006276784359142695,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.01575920875647135
+          },
+          {
+            "residual_m": 0.007819454435727735,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.02445754706896886
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.004768962609950694,
+        "cost_reference": 0.0,
+        "cost_total": 0.14030586326486544,
+        "cost_uwb": 0.13553690065491475,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08693351933033863,
+            "vector": [
+              -0.056633328062649424,
+              0.06595531014032673
+            ],
+            "weighted_sq": 0.00188935919578959
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.049720257104310224,
+            "vector": [
+              0.040932652990604446,
+              -0.0282244908841501
+            ],
+            "weighted_sq": 0.0006180259916296778
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08180435976592061,
+            "vector": [
+              -0.004915991595433544,
+              -0.08165651415132658
+            ],
+            "weighted_sq": 0.0016729883191780428
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.048521710742857514,
+            "vector": [
+              0.020616239604438924,
+              0.043924105887153786
+            ],
+            "weighted_sq": 0.0005885891033533835
+          }
+        ],
+        "iteration": 16,
+        "positions": {
+          "robot_0": [
+            1.9433666719373506,
+            0.06595531014032673
+          ],
+          "robot_1": [
+            7.0409326529906044,
+            -0.0282244908841501
+          ],
+          "robot_2": [
+            1.9950840084045665,
+            4.918343485848673
+          ],
+          "robot_3": [
+            7.020616239604439,
+            5.043924105887154
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.007098085702764045,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.02015312825751334
+          },
+          {
+            "residual_m": 0.006580368186249075,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.017320498186639575
+          },
+          {
+            "residual_m": -0.008511355741878113,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.028977270625920606
+          },
+          {
+            "residual_m": -0.008495378770634332,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.0288685841826178
+          },
+          {
+            "residual_m": 0.006276783940109887,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.015759206652328557
+          },
+          {
+            "residual_m": 0.007819560849225304,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.024458212749894865
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.004768963182242521,
+        "cost_reference": 0.0,
+        "cost_total": 0.14030575122734265,
+        "cost_uwb": 0.13553678804510014,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08693351933033863,
+            "vector": [
+              -0.056633328062649424,
+              0.06595531014032673
+            ],
+            "weighted_sq": 0.00188935919578959
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.049720257104310224,
+            "vector": [
+              0.040932652990604446,
+              -0.0282244908841501
+            ],
+            "weighted_sq": 0.0006180259916296778
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08180435976592061,
+            "vector": [
+              -0.004915991595433544,
+              -0.08165651415132658
+            ],
+            "weighted_sq": 0.0016729883191780428
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.04852173433195522,
+            "vector": [
+              0.020616134989106527,
+              0.04392418104747975
+            ],
+            "weighted_sq": 0.0005885896756452104
+          }
+        ],
+        "iteration": 17,
+        "positions": {
+          "robot_0": [
+            1.9433666719373506,
+            0.06595531014032673
+          ],
+          "robot_1": [
+            7.0409326529906044,
+            -0.0282244908841501
+          ],
+          "robot_2": [
+            1.9950840084045665,
+            4.918343485848673
+          ],
+          "robot_3": [
+            7.0206161349891065,
+            5.04392418104748
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.007098085702764045,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.02015312825751334
+          },
+          {
+            "residual_m": 0.006580368186249075,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.017320498186639575
+          },
+          {
+            "residual_m": -0.008511377823767319,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.02897742098356724
+          },
+          {
+            "residual_m": -0.008495378770634332,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.0288685841826178
+          },
+          {
+            "residual_m": 0.006276859518865585,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.015759586167829402
+          },
+          {
+            "residual_m": 0.007819458144100011,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.024457570266932797
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.004744370769990422,
+        "cost_reference": 0.0,
+        "cost_total": 0.13918682315731531,
+        "cost_uwb": 0.13444245238732488,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08672490872303716,
+            "vector": [
+              -0.05631020086459371,
+              0.06595734281797773
+            ],
+            "weighted_sq": 0.001880302448254782
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.049469355207835665,
+            "vector": [
+              0.04062698008383325,
+              -0.028225265170531765
+            ],
+            "weighted_sq": 0.0006118042761697544
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08174503686251082,
+            "vector": [
+              -0.004309365611181892,
+              -0.0816313690910695
+            ],
+            "weighted_sq": 0.0016705627629133135
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.04823696850560043,
+            "vector": [
+              0.01999273572963034,
+              0.04389869757356646
+            ],
+            "weighted_sq": 0.0005817012826525718
+          }
+        ],
+        "iteration": 18,
+        "positions": {
+          "robot_0": [
+            1.9436897991354063,
+            0.06595734281797773
+          ],
+          "robot_1": [
+            7.040626980083833,
+            -0.028225265170531765
+          ],
+          "robot_2": [
+            1.995690634388818,
+            4.9183686309089305
+          ],
+          "robot_3": [
+            7.01999273572963,
+            5.0438986975735665
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.006469444759898302,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.01674148620055024
+          },
+          {
+            "residual_m": 0.006606508914584808,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.017458384015395415
+          },
+          {
+            "residual_m": -0.00920648320379236,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.03390373319268433
+          },
+          {
+            "residual_m": -0.009128673418069333,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.033333071349506256
+          },
+          {
+            "residual_m": 0.006253433131320207,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.015642170371157303
+          },
+          {
+            "residual_m": 0.006588552052240182,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.017363607258031325
+          }
+        ]
+      },
+      {
+        "cost_gnss": 0.004744335216422306,
+        "cost_reference": 0.0,
+        "cost_total": 0.13918682246171815,
+        "cost_uwb": 0.13444248724529584,
+        "gnss_residuals": [
+          {
+            "agent_id": "robot_0",
+            "norm": 0.08672157373473542,
+            "vector": [
+              -0.05630777181646751,
+              0.06595503152977626
+            ],
+            "weighted_sq": 0.0018801578377572884
+          },
+          {
+            "agent_id": "robot_1",
+            "norm": 0.04946928559221587,
+            "vector": [
+              0.040628503567305074,
+              -0.028222950144974127
+            ],
+            "weighted_sq": 0.0006118025542510541
+          },
+          {
+            "agent_id": "robot_2",
+            "norm": 0.08174684813821033,
+            "vector": [
+              -0.0043117281578226585,
+              -0.08163305813715827
+            ],
+            "weighted_sq": 0.0016706367951329056
+          },
+          {
+            "agent_id": "robot_3",
+            "norm": 0.048238492069344704,
+            "vector": [
+              0.019990052881682097,
+              0.043901593398324223
+            ],
+            "weighted_sq": 0.000581738029281058
+          }
+        ],
+        "iteration": 19,
+        "positions": {
+          "robot_0": [
+            1.9436922281835325,
+            0.06595503152977626
+          ],
+          "robot_1": [
+            7.040628503567305,
+            -0.028222950144974127
+          ],
+          "robot_2": [
+            1.9956882718421773,
+            4.918366941862842
+          ],
+          "robot_3": [
+            7.019990052881682,
+            5.043901593398324
+          ]
+        },
+        "reference_residuals": [],
+        "uwb_residuals": [
+          {
+            "residual_m": 0.006468453880180469,
+            "source_id": "robot_0",
+            "target_id": "robot_1",
+            "weighted_sq": 0.016736358240008707
+          },
+          {
+            "residual_m": 0.006607079777196212,
+            "source_id": "robot_0",
+            "target_id": "robot_2",
+            "weighted_sq": 0.01746140127289406
+          },
+          {
+            "residual_m": -0.009206487255050355,
+            "source_id": "robot_0",
+            "target_id": "robot_3",
+            "weighted_sq": 0.03390376303096185
+          },
+          {
+            "residual_m": -0.00912870196926896,
+            "source_id": "robot_1",
+            "target_id": "robot_2",
+            "weighted_sq": 0.03333327985749399
+          },
+          {
+            "residual_m": 0.006254031039371277,
+            "source_id": "robot_1",
+            "target_id": "robot_3",
+            "weighted_sq": 0.015645161696567753
+          },
+          {
+            "residual_m": 0.006588346368279652,
+            "source_id": "robot_2",
+            "target_id": "robot_3",
+            "weighted_sq": 0.017362523147369472
+          }
+        ]
+      }
+    ],
+    "trace_type": "residual_evaluation"
+  },
+  "uwb_links": [
+    {
+      "distance_m": 5.091337827997871,
+      "sigma_m": 0.05,
+      "source_id": "robot_0",
+      "target_id": "robot_1",
+      "true_distance_m": 5.0
+    },
+    {
+      "distance_m": 4.8460834044900984,
+      "sigma_m": 0.05,
+      "source_id": "robot_0",
+      "target_id": "robot_2",
+      "true_distance_m": 5.0
+    },
+    {
+      "distance_m": 7.118971010630918,
+      "sigma_m": 0.05,
+      "source_id": "robot_0",
+      "target_id": "robot_3",
+      "true_distance_m": 7.0710678118654755
+    },
+    {
+      "distance_m": 7.074549673248523,
+      "sigma_m": 0.05,
+      "source_id": "robot_1",
+      "target_id": "robot_2",
+      "true_distance_m": 7.0710678118654755
+    },
+    {
+      "distance_m": 5.065912501209054,
+      "sigma_m": 0.05,
+      "source_id": "robot_1",
+      "target_id": "robot_3",
+      "true_distance_m": 5.0
+    },
+    {
+      "distance_m": 5.01928146249992,
+      "sigma_m": 0.05,
+      "source_id": "robot_2",
+      "target_id": "robot_3",
+      "true_distance_m": 5.0
+    }
+  ]
+}
