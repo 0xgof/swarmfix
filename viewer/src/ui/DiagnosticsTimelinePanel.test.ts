@@ -54,16 +54,24 @@ describe("DiagnosticsTimelinePanel", () => {
     expect(panel.element.textContent).toContain("0.600 m");
     expect(panel.element.textContent).toContain("GNSS 1.200 m");
     expect(panel.element.textContent).toContain("solver 0.300 m");
+    const plots = Array.from(panel.element.querySelectorAll(".diagnostics-timeline-plot"));
+    expect(plots[0]?.textContent).toContain("display tracking error");
+    expect(plots[1]?.textContent).toContain("cost vs time");
+    const errorPlot = Array.from(panel.element.querySelectorAll(".diagnostics-timeline-plot"))
+      .find((plot) => plot.textContent?.includes("display tracking error"));
     const legendItems = panel.element.querySelectorAll(".diagnostics-timeline-legend-item");
     expect(legendItems).toHaveLength(3);
+    const legend = panel.element.querySelector(".diagnostics-timeline-legend");
+    const plotFrame = legend?.parentElement;
+    expect(plotFrame?.classList.contains("diagnostics-timeline-plot-frame")).toBe(true);
+    expect(errorPlot?.querySelector(".diagnostics-timeline-plot-frame .diagnostics-timeline-legend"))
+      .toBe(legend);
     expect(panel.element.textContent).toContain("display");
     expect(panel.element.textContent).toContain("GNSS");
     expect(panel.element.textContent).toContain("solver snapshot");
     expect(panel.element.querySelectorAll("path.diagnostics-timeline-path")).toHaveLength(4);
     expect(panel.element.querySelectorAll("path.diagnostics-timeline-path-secondary")).toHaveLength(1);
     expect(panel.element.querySelectorAll("path.diagnostics-timeline-path-solver")).toHaveLength(1);
-    const errorPlot = Array.from(panel.element.querySelectorAll(".diagnostics-timeline-plot"))
-      .find((plot) => plot.textContent?.includes("display tracking error"));
     const floor = errorPlot?.querySelector("rect.diagnostics-timeline-zero-floor");
     expect(floor).not.toBeNull();
     expect(Number(floor?.getAttribute("height"))).toBeGreaterThan(0);
@@ -74,8 +82,15 @@ describe("DiagnosticsTimelinePanel", () => {
     expect(floorBottom).toBeCloseTo(86);
     const zeroLabel = errorPlot?.querySelector("text.diagnostics-timeline-zero-label");
     expect(zeroLabel?.textContent).toBe("0");
+    expect(Number(zeroLabel?.getAttribute("y"))).toBeGreaterThan(
+      Number(floor?.getAttribute("y"))
+    );
+    expect(Number(zeroLabel?.getAttribute("y"))).toBeLessThan(floorBottom);
     const gnssLabel = errorPlot?.querySelector("text.diagnostics-timeline-gnss-label");
     expect(gnssLabel?.textContent).toBe("GNSS 1.200 m");
+    const solverLabel = errorPlot?.querySelector("text.diagnostics-timeline-solver-label");
+    expect(solverLabel?.textContent).toBe("solver 0.300 m");
+    expect(errorPlot?.querySelector("text.diagnostics-timeline-display-label")).toBeNull();
     const gnssPath = errorPlot?.querySelector("path.diagnostics-timeline-path-secondary");
     const gnssPathCoordinates = gnssPath?.getAttribute("d")?.split(" ") ?? [];
     const latestGnssLineY = Number(gnssPathCoordinates[gnssPathCoordinates.length - 1]);

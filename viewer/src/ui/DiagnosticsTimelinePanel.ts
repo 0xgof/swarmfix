@@ -209,6 +209,8 @@ function createPlot(title: string,
   svg.setAttribute("viewBox", `0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`);
   svg.setAttribute("role", "img");
   svg.setAttribute("aria-label", title);
+  const plotFrame = document.createElement("div");
+  plotFrame.className = "diagnostics-timeline-plot-frame";
   const rangeValues = samples.flatMap((sample) => {
     const values = [];
     const primaryValue = readValue(sample);
@@ -233,7 +235,7 @@ function createPlot(title: string,
       svg,
       "diagnostics-timeline-zero-label",
       "0",
-      yForValue(0, sharedRange) - 3
+      yForValue(0, sharedRange) + 12
     );
   }
   const path = document.createElementNS(SVG_NS, "path");
@@ -241,13 +243,19 @@ function createPlot(title: string,
   path.setAttribute("d", pathForSeries(samples, readValue, sharedRange));
   svg.append(path);
   for (const series of secondarySeries) {
-    if (options.zeroFloor && series.label === "GNSS") {
+    if (
+      options.zeroFloor
+      && (series.label === "GNSS" || series.label === "solver snapshot")
+    ) {
       const latestSample = samples[samples.length - 1];
       const latestValue = series.readValue(latestSample);
       if (isFiniteNumber(latestValue)) {
+        const labelClassName = series.label === "GNSS"
+          ? "diagnostics-timeline-gnss-label"
+          : "diagnostics-timeline-solver-label";
         appendPlotLabel(
           svg,
-          "diagnostics-timeline-gnss-label",
+          labelClassName,
           series.currentText,
           yForValue(latestValue, sharedRange) - 3
         );
@@ -268,7 +276,7 @@ function createPlot(title: string,
     ));
     svg.append(secondaryPath);
   }
-  section.append(header, svg);
+  plotFrame.append(svg);
   if (legendItems.length > 0) {
     const legend = document.createElement("div");
     legend.className = "diagnostics-timeline-legend";
@@ -282,8 +290,9 @@ function createPlot(title: string,
       legendItem.append(swatch, labelText);
       legend.append(legendItem);
     }
-    section.append(legend);
+    plotFrame.append(legend);
   }
+  section.append(header, plotFrame);
   return section;
 }
 
@@ -365,12 +374,6 @@ export class DiagnosticsTimelinePanel {
     ];
     this.element.append(
       createPlot(
-        "cost vs time",
-        formatNumber(latestSample.costTotal),
-        samples,
-        (sample) => sample.costTotal
-      ),
-      createPlot(
         "display tracking error",
         formatMeters(latestSample.errorRmseM),
         samples,
@@ -378,6 +381,12 @@ export class DiagnosticsTimelinePanel {
         errorOverlays,
         errorLegendItems,
         { zeroFloor: true }
+      ),
+      createPlot(
+        "cost vs time",
+        formatNumber(latestSample.costTotal),
+        samples,
+        (sample) => sample.costTotal
       )
     );
   }

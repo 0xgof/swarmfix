@@ -207,7 +207,14 @@ body {
   min-height: 0;
 }
 
+.diagnostics-timeline-plot-frame {
+  position: relative;
+  min-height: 48px;
+  min-width: 0;
+}
+
 .diagnostics-timeline-plot svg {
+  display: block;
   width: 100%;
   height: 100%;
   min-height: 48px;
@@ -228,7 +235,8 @@ body {
 }
 
 .diagnostics-timeline-zero-label,
-.diagnostics-timeline-gnss-label {
+.diagnostics-timeline-gnss-label,
+.diagnostics-timeline-solver-label {
   font-size: 9px;
   font-weight: 500;
   paint-order: stroke;
@@ -244,6 +252,10 @@ body {
   fill: #b24b24;
 }
 
+.diagnostics-timeline-solver-label {
+  fill: #2468b2;
+}
+
 .diagnostics-timeline-path-secondary {
   stroke: #b24b24;
   stroke-dasharray: 6 4;
@@ -255,14 +267,26 @@ body {
 }
 
 .diagnostics-timeline-legend {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
   display: flex;
   flex-wrap: wrap;
   gap: 6px 12px;
   align-items: center;
+  justify-content: center;
   min-height: 16px;
+  max-width: calc(100% - 24px);
+  box-sizing: border-box;
+  padding: 3px 8px;
+  border: 1px solid rgba(216, 220, 224, 0.86);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.84);
   color: #333333;
   font-size: 11px;
   line-height: 1.2;
+  pointer-events: none;
 }
 
 .diagnostics-timeline-legend-item {
