@@ -40,7 +40,8 @@ or a known mission reference point.
 ## Requirements
 
 Use Python 3.11 or newer. The project has been exercised locally with Python
-3.12.
+3.12. On Windows, use `py -3.12` if `python` resolves to an older interpreter
+or is not on `PATH`.
 
 The Python package depends on:
 
@@ -52,9 +53,11 @@ The Python package depends on:
 The viewer uses Node, Vite, TypeScript, Vitest, and Three.js. Install viewer
 dependencies from `viewer/` with `npm install`.
 
-The native C solver backend is optional at development time unless you select
-or run a path that requires it. Build it from `native/uwb_gnss_solver/` with a C
-toolchain and CMake before using the C backend.
+The native C solver backend is optional for most Python development paths, but
+the live server defaults to `c-uwb-gnss`. Build it from
+`native/uwb_gnss_solver/` with a C toolchain and CMake before using the default
+live backend, or select the Python reference backend explicitly with
+`--solver-backend python-scipy`.
 
 ## Run The Python Pipeline
 
@@ -94,13 +97,21 @@ Start the Python live solve API:
 python -m swarmfix.live.server --host 127.0.0.1 --port 8765
 ```
 
+Use the Python reference backend when the native C solver has not been built:
+
+```bash
+python -m swarmfix.live.server --host 127.0.0.1 --port 8765 --solver-backend python-scipy
+```
+
 After editable install, the console script is:
 
 ```bash
 swarmfix-live-server --host 127.0.0.1 --port 8765
 ```
 
-The viewer expects the live API at `http://127.0.0.1:8765` by default.
+The viewer expects the live API at `http://127.0.0.1:8765` by default. The
+server exposes `GET /health`, `POST /live/frame`, `POST /solve`,
+`GET /mission-actions/catalog`, and `POST /mission-actions/positions`.
 
 ## Run The Viewer
 
@@ -131,10 +142,16 @@ Python tests from the repository root:
 python -m pytest -q tests
 ```
 
+On Windows with the Python launcher:
+
+```bash
+py -3.12 -m pytest -q tests
+```
+
 Expected current result:
 
 ```text
-112 passed
+198 passed
 ```
 
 Viewer tests from `viewer/`:
@@ -143,11 +160,16 @@ Viewer tests from `viewer/`:
 npm run test -- --run
 ```
 
-Expected current result:
+Current full-suite note:
 
 ```text
-35 test files passed, 172 tests passed
+50 test files discovered, 288 tests discovered.
 ```
+
+The full viewer suite is currently broader than the focused checks used during
+viewer feature work. In this checkout, `npm run test -- --run` may fail on
+slow grid tests in constrained environments; use focused Vitest file targets
+when validating a scoped viewer change.
 
 If VS Code shows Python discovery failures, make sure the selected interpreter
 is Python 3.11+ and not an older global Python. This repo uses `tomllib`, which
